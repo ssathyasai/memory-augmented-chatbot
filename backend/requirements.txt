@@ -5,7 +5,7 @@ groq==0.4.2
 pydantic==2.4.2
 pydantic-settings==2.0.3
 python-multipart==0.0.6
-faiss-cpu==1.7.4
+faiss-cpu==1.8.0
 pymupdf==1.23.8
 sentence-transformers==2.2.2
 pymongo[srv]==4.6.0
