@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory-Augmented Chatbot</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Markdown parser for rendering markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>🤖 Chatbot</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="chat">
+                    <span>💬</span> Chat
+                </a>
+                <a href="#" class="nav-item" data-page="documents">
+                    <span>📄</span> Documents
+                </a>
+                <a href="#" class="nav-item" data-page="knowledge-graph">
+                    <span>🌐</span> Knowledge Graph
+                </a>
+                <a href="#" class="nav-item" data-page="memory">
+                    <span>🧠</span> Memory
+                </a>
+                <a href="#" class="nav-item" data-page="analytics">
+                    <span>📊</span> Analytics
+                </a>
+                <a href="#" class="nav-item" data-page="settings">
+                    <span>⚙️</span> Settings
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Chat Page -->
+            <div id="chat-page" class="page active">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <h2>Chat with AI</h2>
+                    </div>
+                    <div id="chat-messages" class="chat-messages">
+                        <!-- Messages will be added here dynamically -->
+                        <div class="message assistant">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <p>Hello! I'm your AI assistant. How can I help you today?</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <form id="chat-form">
+                            <textarea id="chat-input" placeholder="Type your message..." rows="1"></textarea>
+                            <button type="submit" id="send-button">
+                                <span>Send</span>
+                                <span>➤</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documents Page -->
+            <div id="documents-page" class="page">
+                <div class="documents-container">
+                    <div class="chat-header">
+                        <h2>📄 Upload Documents</h2>
+                    </div>
+                    <div class="upload-area">
+                        <input type="file" id="pdf-upload" accept=".pdf" multiple>
+                        <label for="pdf-upload" class="upload-button">
+                            <span>📤</span> Upload PDFs
+                        </label>
+                    </div>
+                    <div id="upload-status" class="upload-status"></div>
+                    <div class="uploaded-docs">
+                        <h3>Uploaded Documents</h3>
+                        <ul id="docs-list"></ul>
+                    </div>
+                </div>
+            </div>
+            <div id="knowledge-graph-page" class="page">
+                <div class="documents-container">
+                    <div class="chat-header">
+                        <h2>🌐 Knowledge Graph</h2>
+                    </div>
+                    <div class="panel-grid">
+                        <section class="dashboard-panel">
+                            <h3>Query Graph</h3>
+                            <div class="inline-form">
+                                <input type="text" id="graph-query-input" placeholder="Search an entity or relationship">
+                                <button id="graph-query-btn" type="button">Search</button>
+                            </div>
+                            <div id="graph-query-results" class="stack-list"></div>
+                        </section>
+                        <section class="dashboard-panel">
+                            <h3>Add Relationship</h3>
+                            <div class="stack-form">
+                                <input type="text" id="graph-from-entity" placeholder="From entity">
+                                <input type="text" id="graph-relationship" placeholder="Relationship">
+                                <input type="text" id="graph-to-entity" placeholder="To entity">
+                                <button id="graph-add-btn" type="button">Add Relationship</button>
+                            </div>
+                        </section>
+                    </div>
+                    <section class="dashboard-panel">
+                        <div class="panel-header-row">
+                            <h3>Entities</h3>
+                            <button id="graph-refresh-btn" type="button">Refresh</button>
+                        </div>
+                        <div id="graph-entities-list" class="card-grid"></div>
+                    </section>
+                </div>
+            </div>
+            <div id="memory-page" class="page">
+                <div class="documents-container">
+                    <div class="chat-header">
+                        <h2>🧠 Memory</h2>
+                    </div>
+                    
+                    <!-- Add new memory form -->
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="margin-bottom: 12px;">Add New Memory</h3>
+                        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+                            <select id="memory-type" style="flex: 0 0 150px; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                                <option value="preference">Preference</option>
+                                <option value="fact">Fact</option>
+                                <option value="conversation">Conversation</option>
+                            </select>
+                            <input type="text" id="memory-content" placeholder="Memory content..." style="flex: 1; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                            <button id="add-memory-btn" style="padding: 8px 20px; background: var(--accent-primary); border: none; border-radius: 8px; color: white; cursor: pointer;">Add</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Search memories -->
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="margin-bottom: 12px;">Search Memories</h3>
+                        <input type="text" id="memory-search" placeholder="Search memories..." style="width: 100%; padding: 12px 16px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                    </div>
+                    
+                    <!-- Memories list -->
+                    <div>
+                        <h3 style="margin-bottom: 12px;">All Memories</h3>
+                        <ul id="memories-list" style="list-style: none; display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Memories will be added here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div id="analytics-page" class="page">
+                <div class="documents-container">
+                    <div class="chat-header">
+                        <h2>📊 Analytics</h2>
+                    </div>
+                    <div id="analytics-cards" class="card-grid"></div>
+                </div>
+            </div>
+            <div id="settings-page" class="page">
+                <div class="documents-container">
+                    <div class="chat-header">
+                        <h2>⚙️ Settings</h2>
+                    </div>
+                    <section class="dashboard-panel">
+                        <div class="stack-form">
+                            <label class="field-label" for="settings-user-id">User ID</label>
+                            <input type="text" id="settings-user-id" placeholder="Enter your user id">
+                            <label class="field-label" for="settings-display-name">Display Name</label>
+                            <input type="text" id="settings-display-name" placeholder="Enter your display name">
+                            <label class="field-label" for="settings-theme">Theme</label>
+                            <select id="settings-theme">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                            </select>
+                            <label class="checkbox-row">
+                                <input type="checkbox" id="settings-transparency" checked>
+                                <span>Show routing and source transparency</span>
+                            </label>
+                            <button id="save-settings-btn" type="button">Save Settings</button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
