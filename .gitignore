@@ -1,0 +1,49 @@
+
+# Environment Variables
+backend/.env
+*.env.local
+.env.*
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.swp
+*.swo
+*~
+*.swp
+*.egg-info/
+dist/
+build/
+*.so
+*.whl
+*.log
+*.whl
+*.egg-info/
+
+# Node.js
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS files
+*.log
+*.tmp
+
+# Vector stores
+*.faiss
+index/
+
