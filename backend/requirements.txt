@@ -14,6 +14,7 @@ langchain
 langchain-core
 langchain-text-splitters
 langchain-community
+langchain-huggingface
 aiofiles
 pymupdf
 sentence-transformers
