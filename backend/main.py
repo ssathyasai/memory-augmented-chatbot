@@ -140,9 +140,20 @@ def _build_system_prompt(
 @app.on_event("startup")
 async def startup_event():
     # Startup loads persisted stores so the dashboard has state immediately.
-    load_or_initialize_vector_store()
-    connect_to_mongodb()
-    connect_to_neo4j()
+    try:
+        load_or_initialize_vector_store()
+    except Exception as e:
+        print(f"Warning: Could not initialize vector store: {e}")
+    
+    try:
+        connect_to_mongodb()
+    except Exception as e:
+        print(f"Warning: Could not connect to MongoDB: {e}")
+    
+    try:
+        connect_to_neo4j()
+    except Exception as e:
+        print(f"Warning: Could not connect to Neo4j: {e}")
 
 
 @app.get("/")
