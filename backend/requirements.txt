@@ -12,6 +12,8 @@ requests
 langgraph
 langchain
 langchain-core
+langchain-text-splitters
+langchain-community
 aiofiles
 pymupdf
 sentence-transformers
