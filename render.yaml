@@ -4,7 +4,8 @@ services:
     name: memory-augmented-chatbot
     env: python
     plan: free
-    buildCommand: pip install --upgrade pip setuptools wheel && pip install -r backend/requirements.txt
+    runtime: python-3.11
+    buildCommand: pip install --upgrade pip && pip install wheel setuptools && pip install -r backend/requirements.txt
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GROQ_API_KEY
