@@ -7,14 +7,18 @@ services:
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: GOOGLE_API_KEY
+      - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
       - key: MONGODB_URI
         sync: false
       - key: NEO4J_URI
         sync: false
-      - key: NEO4J_USERNAME
+      - key: NEO4J_USER
         value: neo4j
       - key: NEO4J_PASSWORD
         sync: false
+      - key: DEBUG
+        value: false
 
