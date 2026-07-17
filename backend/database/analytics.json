@@ -1,0 +1,11 @@
+[
+  {
+    "user_id": "demo-user",
+    "response_time": 0.12,
+    "route": "tool",
+    "sources_count": 0,
+    "memories_count": 0,
+    "graph_count": 0,
+    "tools_count": 1
+  }
+]
