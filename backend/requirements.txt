@@ -9,3 +9,11 @@ pymongo[srv]
 neo4j
 httpx
 requests
+langgraph
+langchain
+langchain-core
+aiofiles
+pymupdf
+sentence-transformers
+faiss-cpu
+numpy
