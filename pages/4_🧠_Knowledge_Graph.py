@@ -1,0 +1,226 @@
+"""Knowledge Graph page with visualization."""
+
+import streamlit as st
+import logging
+
+from utils.session import require_auth, init_session_state, get_user_id
+from knowledge_graph.manager import KnowledgeGraphManager
+
+logger = logging.getLogger(__name__)
+
+# Initialize session
+init_session_state()
+
+# Require authentication
+require_auth()
+
+# Page config
+st.title("🧠 Knowledge Graph")
+
+user_id = get_user_id()
+
+# Initialize knowledge graph manager
+if "kg_manager" not in st.session_state:
+    st.session_state.kg_manager = KnowledgeGraphManager(user_id)
+
+kg_manager = st.session_state.kg_manager
+
+# Get statistics
+stats = kg_manager.get_stats()
+
+# Header stats
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("📌 Total Entities", stats.get("entities", 0))
+
+with col2:
+    st.metric("🔗 Total Relationships", stats.get("relationships", 0))
+
+with col3:
+    entity_types = kg_manager.get_entity_types()
+    st.metric("🏷️ Entity Types", len(entity_types))
+
+st.markdown("---")
+
+# Entity extraction tool
+with st.expander("🔍 Extract Entities from Text"):
+    st.markdown("Enter text to extract entities and add them to your knowledge graph.")
+    
+    text_input = st.text_area(
+        "Input Text",
+        placeholder="Enter text to analyze...",
+        height=150
+    )
+    
+    if st.button("Extract & Add to Graph", type="primary"):
+        if text_input.strip():
+            with st.spinner("Extracting entities..."):
+                result = kg_manager.process_text(text_input)
+                
+                if result["success"]:
+                    st.success(f"✅ Extracted {result['entities_extracted']} entities, added {result['entities_added']} to graph")
+                    
+                    if result.get("entities"):
+                        st.markdown("**Extracted Entities:**")
+                        for entity in result["entities"]:
+                            st.caption(f"• **{entity['name']}** ({entity['type']})")
+                    
+                    st.rerun()
+                else:
+                    st.error(f"Error: {result.get('error', 'Unknown error')}")
+        else:
+            st.warning("Please enter some text")
+
+# Tabs for different views
+tab1, tab2, tab3 = st.tabs(["📌 Entities", "🔗 Relationships", "📊 Analytics"])
+
+with tab1:
+    st.markdown("### All Entities")
+    
+    # Filter controls
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        search_entity = st.text_input("🔍 Search entities", placeholder="Type to filter...")
+    
+    with col2:
+        entity_types_list = list(entity_types.keys()) if entity_types else []
+        filter_type = st.selectbox("Filter by type", ["All"] + entity_types_list)
+    
+    # Get entities
+    type_filter = None if filter_type == "All" else filter_type
+    entities = kg_manager.get_entities(entity_type=type_filter, limit=100)
+    
+    # Filter by search
+    if search_entity:
+        entities = [e for e in entities if search_entity.lower() in e.get("name", "").lower()]
+    
+    if entities:
+        st.markdown(f"**Showing {len(entities)} entities**")
+        
+        # Display entities in a grid
+        for i in range(0, len(entities), 3):
+            cols = st.columns(3)
+            for j, col in enumerate(cols):
+                if i + j < len(entities):
+                    entity = entities[i + j]
+                    with col:
+                        with st.container():
+                            st.markdown(f"**{entity.get('name', 'Unknown')}**")
+                            st.caption(f"Type: {entity.get('type', 'unknown')}")
+                            
+                            # Show relationships button
+                            if st.button("View Connections", key=f"entity_{i}_{j}"):
+                                st.session_state.selected_entity = entity.get('name')
+                                st.rerun()
+    else:
+        st.info("No entities found. Extract entities from your conversations or documents.")
+
+with tab2:
+    st.markdown("### Relationships")
+    
+    # Get selected entity if any
+    selected_entity = st.session_state.get("selected_entity")
+    
+    if selected_entity:
+        st.info(f"Showing relationships for: **{selected_entity}**")
+        if st.button("Clear Selection"):
+            st.session_state.selected_entity = None
+            st.rerun()
+    
+    # Get relationships
+    relationships = kg_manager.get_relationships(entity_name=selected_entity)
+    
+    if relationships:
+        st.markdown(f"**Found {len(relationships)} relationships**")
+        
+        for rel in relationships:
+            col1, col2, col3 = st.columns([2, 1, 2])
+            
+            with col1:
+                st.markdown(f"**{rel.get('source', 'Unknown')}**")
+            
+            with col2:
+                rel_type = rel.get('type', 'related')
+                st.markdown(f"→ *{rel_type}* →")
+            
+            with col3:
+                st.markdown(f"**{rel.get('target', 'Unknown')}**")
+            
+            st.markdown("---")
+    else:
+        if selected_entity:
+            st.info(f"No relationships found for {selected_entity}")
+        else:
+            st.info("No relationships in the knowledge graph yet.")
+
+with tab3:
+    st.markdown("### Analytics")
+    
+    if entity_types:
+        st.markdown("#### Entity Type Distribution")
+        
+        # Sort by count
+        sorted_types = sorted(entity_types.items(), key=lambda x: x[1], reverse=True)
+        
+        # Display as bar chart
+        import pandas as pd
+        
+        df = pd.DataFrame(sorted_types, columns=["Type", "Count"])
+        st.bar_chart(df.set_index("Type"))
+        
+        # Display as table
+        st.markdown("#### Detailed Breakdown")
+        for entity_type, count in sorted_types:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"**{entity_type.capitalize()}**")
+            with col2:
+                st.metric("Count", count)
+    else:
+        st.info("No entities to analyze yet.")
+    
+    # Overall stats
+    st.markdown("---")
+    st.markdown("#### Overall Statistics")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Total Entities", stats.get("entities", 0))
+    
+    with col2:
+        st.metric("Total Relationships", stats.get("relationships", 0))
+    
+    with col3:
+        if stats.get("entities", 0) > 0:
+            connectivity = stats.get("relationships", 0) / stats.get("entities", 1)
+            st.metric("Avg Connections", f"{connectivity:.2f}")
+        else:
+            st.metric("Avg Connections", "0.00")
+
+# Help section
+st.markdown("---")
+with st.expander("ℹ️ About Knowledge Graph"):
+    st.markdown("""
+    ### What is a Knowledge Graph?
+    
+    A knowledge graph automatically extracts and connects important information from your documents and conversations.
+    
+    **Features:**
+    - **Entities**: People, organizations, locations, concepts mentioned in your data
+    - **Relationships**: How entities are connected to each other
+    - **Analytics**: Insights about your knowledge base
+    
+    **How it works:**
+    1. As you chat and upload documents, entities are automatically extracted
+    2. Entities are stored in a graph database (Neo4j)
+    3. You can explore connections and discover insights
+    
+    **Use cases:**
+    - Discover hidden connections in your documents
+    - Track mentions of people, companies, or concepts
+    - Visualize your knowledge network
+    """)
+
