@@ -187,7 +187,8 @@ Answer the user's question using this up-to-date information."""
             )
             state['evaluation'] = evaluation
             
-            self._save_chat_message(question, answer, sources, query_type, evaluation)
+            session_id = state.get("session_id")
+            self._save_chat_message(question, answer, sources, query_type, evaluation, session_id=session_id)
             
             # Extract and save user preferences from user query
             from memory.long_term import LongTermMemoryManager
@@ -197,7 +198,6 @@ Answer the user's question using this up-to-date information."""
             try:
                 from knowledge_graph.manager import KnowledgeGraphManager
                 kg_mgr = KnowledgeGraphManager(self.user_id)
-                session_id = state.get("session_id")
                 kg_mgr.process_conversation(question, answer, session_id=session_id)
             except Exception as e:
                 logger.error(f"Error updating Knowledge Graph from conversation: {e}")
@@ -356,7 +356,8 @@ Answer the user's question using this up-to-date information."""
         answer: str,
         sources: List[Dict],
         query_type: str,
-        evaluation: Dict[str, Any]
+        evaluation: Dict[str, Any],
+        session_id: str = None
     ) -> None:
         """Save a chat message to MongoDB."""
         from config.database import get_database
@@ -367,6 +368,7 @@ Answer the user's question using this up-to-date information."""
             if db is not None:
                 chat_doc = {
                     "user_id": self.user_id,
+                    "session_id": session_id,
                     "question": question,
                     "answer": answer,
                     "sources": sources,

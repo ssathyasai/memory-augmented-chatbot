@@ -43,34 +43,32 @@ with col3:
 
 st.markdown("---")
 
-# Entity extraction tool
-with st.expander("🔍 Extract Entities from Text"):
-    st.markdown("Enter text to extract entities and add them to your knowledge graph.")
-    
-    text_input = st.text_area(
-        "Input Text",
-        placeholder="Enter text to analyze...",
-        height=150
-    )
-    
-    if st.button("Extract & Add to Graph", type="primary"):
-        if text_input.strip():
-            with st.spinner("Extracting entities..."):
-                result = kg_manager.process_text(text_input)
-                
-                if result["success"]:
-                    st.success(f"✅ Extracted {result['entities_extracted']} entities, added {result['entities_added']} to graph")
-                    
-                    if result.get("entities"):
-                        st.markdown("**Extracted Entities:**")
-                        for entity in result["entities"]:
-                            st.caption(f"• **{entity['name']}** ({entity['type']})")
-                    
-                    st.rerun()
-                else:
-                    st.error(f"Error: {result.get('error', 'Unknown error')}")
+# Rebuild Graph from chats tool
+if st.button("🔄 Analyze Past Chats & Load Graph", type="primary", use_container_width=True):
+    with st.spinner("Analyzing all your past chats to build your Knowledge Graph..."):
+        from config.database import get_database
+        db = get_database()
+        if db is not None:
+            # 1. Clear current graph first to avoid duplicates
+            kg_manager.kg.clear_graph()
+            
+            # 2. Find all chats for this user in MongoDB (in chronological order)
+            user_chats = list(db.chats.find({"user_id": user_id}).sort("timestamp", 1))
+            
+            # 3. Re-process each chat to extract relationships
+            processed_count = 0
+            for chat in user_chats:
+                question = chat.get("question", "")
+                answer = chat.get("answer", "")
+                session_id = chat.get("session_id")
+                if question and answer:
+                    kg_manager.process_conversation(question, answer, session_id=session_id)
+                    processed_count += 1
+            
+            st.success(f"✅ Load complete! Successfully analyzed {processed_count} past conversation turns and loaded your Knowledge Graph.")
+            st.rerun()
         else:
-            st.warning("Please enter some text")
+            st.error("Database connection unavailable.")
 
 # Tabs for different views
 tab1, tab2, tab3 = st.tabs(["📌 Entities", "🔗 Relationships", "📊 Analytics"])
