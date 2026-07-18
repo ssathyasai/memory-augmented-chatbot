@@ -76,11 +76,12 @@ def clear_session():
 
 def require_auth():
     """
-    Decorator/function to require authentication.
-    Redirects to login if not authenticated.
+    Function to require authentication.
+    Redirects to main login page if not authenticated.
     """
     if not is_authenticated():
-        st.warning("Please log in to access this page.")
+        st.warning("Please log in to access this page. Redirecting to login...")
+        st.switch_page("app.py")
         st.stop()
 
 
