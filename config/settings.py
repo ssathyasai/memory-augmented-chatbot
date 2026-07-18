@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     
     # GROQ
     GROQ_API_KEY: str = Field(..., description="GROQ API key")
-    GROQ_MODEL: str = "openai/gpt-oss-20b"
-    GROQ_MAX_TOKENS: int = 65536
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_MAX_TOKENS: int = 1024
     GROQ_TEMPERATURE: float = 0.7
     
     # Embeddings

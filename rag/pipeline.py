@@ -49,6 +49,32 @@ class RAGPipeline:
             logger.error(f"Error indexing document: {e}")
             raise
     
+    def _truncate_history(
+        self,
+        conversation_history: List[Dict[str, str]],
+        max_messages: int = 6,
+        max_chars: int = 4000
+    ) -> List[Dict[str, str]]:
+        """
+        Trim conversation history to stay within token budget.
+
+        Args:
+            conversation_history: Full history list
+            max_messages: Maximum number of recent turns to keep
+            max_chars: Rough character budget for all messages combined
+
+        Returns:
+            Trimmed history list
+        """
+        # Keep only the most recent messages
+        history = conversation_history[-max_messages:] if conversation_history else []
+
+        # Further trim if combined content still exceeds character budget
+        while history and sum(len(m.get("content", "")) for m in history) > max_chars:
+            history = history[1:]  # drop oldest
+
+        return history
+
     def query(
         self,
         question: str,
@@ -118,7 +144,8 @@ Rules:
                 logger.info("No documents found, using direct LLM")
                 if conversation_history is None:
                     conversation_history = []
-                messages = conversation_history + [{"role": "user", "content": question}]
+                truncated = self._truncate_history(conversation_history)
+                messages = truncated + [{"role": "user", "content": question}]
                 answer = self.llm_client.chat_completion(messages)
                 
                 return {
@@ -187,7 +214,8 @@ Rules:
                 return result["answer"]
             else:
                 # Direct LLM call without retrieval
-                return self.llm_client.chat_completion(messages)
+                truncated = self._truncate_history(messages)
+                return self.llm_client.chat_completion(truncated)
         
         except Exception as e:
             logger.error(f"Error in chat: {e}")
