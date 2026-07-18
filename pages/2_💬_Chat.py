@@ -138,6 +138,10 @@ with st.sidebar:
 # Main chat interface
 st.markdown("### 💭 Conversation")
 
+# Always sync memory_manager session_id with session state
+if st.session_state.current_session_id:
+    st.session_state.memory_manager.set_session(st.session_state.current_session_id)
+
 # Load and display conversation history
 messages = st.session_state.memory_manager.get_conversation_history()
 
@@ -243,8 +247,8 @@ if prompt := st.chat_input("Ask me anything..."):
                         "evaluation": result.get("evaluation")
                     }
                 )
-                
-                st.rerun()
+                # DO NOT call st.rerun() here — Streamlit will re-render naturally
+                # after st.chat_input processes the submission, preserving messages.
             
             except Exception as e:
                 error_msg = get_user_message(e)
