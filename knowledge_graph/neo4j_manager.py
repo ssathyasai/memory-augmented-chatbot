@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from config.neo4j_client import neo4j_manager
+from config.settings import settings
 from errors.exceptions import KnowledgeGraphError
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class Neo4jKnowledgeGraph:
         """
         self.user_id = user_id
         self.driver = neo4j_manager.get_driver()
+        self.database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
     
     def add_entity(
         self,
@@ -60,7 +62,7 @@ class Neo4jKnowledgeGraph:
             RETURN e
             """
             
-            with self.driver.session() as session:
+            with self.driver.session(database=self.database) as session:
                 session.run(query, **props)
             
             return True
@@ -104,7 +106,7 @@ class Neo4jKnowledgeGraph:
             RETURN r
             """
             
-            with self.driver.session() as session:
+            with self.driver.session(database=self.database) as session:
                 session.run(
                     query,
                     user_id=self.user_id,
@@ -150,7 +152,7 @@ class Neo4jKnowledgeGraph:
                 """
                 params = {"user_id": self.user_id, "limit": limit}
             
-            with self.driver.session() as session:
+            with self.driver.session(database=self.database) as session:
                 result = session.run(query, **params)
                 entities = [dict(record) for record in result]
             
@@ -191,7 +193,7 @@ class Neo4jKnowledgeGraph:
                 """
                 params = {"user_id": self.user_id}
             
-            with self.driver.session() as session:
+            with self.driver.session(database=self.database) as session:
                 result = session.run(query, **params)
                 relationships = [dict(record) for record in result]
             
@@ -212,7 +214,7 @@ class Neo4jKnowledgeGraph:
             return {"entities": 0, "relationships": 0}
         
         try:
-            with self.driver.session() as session:
+            with self.driver.session(database=self.database) as session:
                 # Count entities
                 result = session.run(
                     "MATCH (e:Entity {user_id: $user_id}) RETURN count(e) AS count",
@@ -251,7 +253,7 @@ class Neo4jKnowledgeGraph:
             return False
             
         try:
-            with self.driver.session() as session:
+            with self.driver.session(database=self.database) as session:
                 # 1. Delete relationships matching user_id and session_id
                 session.run(
                     "MATCH (s:Entity {user_id: $user_id})-[r:RELATED {session_id: $session_id}]->(t:Entity) DELETE r",
@@ -284,7 +286,7 @@ class Neo4jKnowledgeGraph:
             return False
             
         try:
-            with self.driver.session() as session:
+            with self.driver.session(database=self.database) as session:
                 # 1. Delete relationships matching user_id and document_id
                 session.run(
                     "MATCH (s:Entity {user_id: $user_id})-[r:RELATED {document_id: $document_id}]->(t:Entity) DELETE r",
@@ -314,7 +316,7 @@ class Neo4jKnowledgeGraph:
             return False
             
         try:
-            with self.driver.session() as session:
+            with self.driver.session(database=self.database) as session:
                 session.run(
                     "MATCH (e:Entity {user_id: $user_id}) DETACH DELETE e",
                     user_id=self.user_id
