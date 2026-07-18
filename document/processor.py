@@ -120,6 +120,16 @@ class DocumentProcessor:
                 }}
             )
             
+            # Extract entities and relationships for the Knowledge Graph
+            try:
+                from knowledge_graph.manager import KnowledgeGraphManager
+                logger.info(f"Extracting KG entities and relationships from document: {filename}")
+                kg_mgr = KnowledgeGraphManager(user_id)
+                # Process the first 15,000 characters to build graph entities
+                kg_mgr.process_text(content[:15000])
+            except Exception as e:
+                logger.error(f"Error building Knowledge Graph for document {filename}: {e}")
+                
             logger.info(f"Document processed: {doc_id}, {len(chunks)} chunks")
             
             # Create Document object

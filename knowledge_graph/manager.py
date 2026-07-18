@@ -53,11 +53,25 @@ class KnowledgeGraphManager:
                 ):
                     added_count += 1
             
-            logger.info(f"Processed text: {len(entities)} entities, {added_count} added to graph")
+            # Add relationships between co-occurring entities in the text
+            added_relationships = 0
+            if len(entities) > 1:
+                for i in range(len(entities) - 1):
+                    source = entities[i]["name"]
+                    target = entities[i+1]["name"]
+                    if self.kg.add_relationship(
+                        source_entity=source,
+                        target_entity=target,
+                        relationship_type="RELATED_TO"
+                    ):
+                        added_relationships += 1
+            
+            logger.info(f"Processed text: {len(entities)} entities ({added_count} added), {added_relationships} relationships added to graph")
             
             return {
                 "entities_extracted": len(entities),
                 "entities_added": added_count,
+                "relationships_added": added_relationships,
                 "entities": entities,
                 "success": True
             }
