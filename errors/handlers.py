@@ -3,6 +3,7 @@
 import logging
 import traceback
 from typing import Dict, Any
+from pydantic import ValidationError as PydanticValidationError
 
 from .exceptions import (
     ChatbotException,
@@ -37,7 +38,7 @@ def log_error(error: Exception, context: Dict[str, Any] = None):
         logger.error(f"{error.__class__.__name__}: {str(error)}{context_str}")
     
     # Log stack trace for non-user errors
-    if not isinstance(error, (ValidationError, AuthenticationError, NotFoundError)):
+    if not isinstance(error, (ValidationError, AuthenticationError, NotFoundError, PydanticValidationError)):
         logger.debug(traceback.format_exc())
 
 
@@ -54,7 +55,20 @@ def handle_error(error: Exception, context: Dict[str, Any] = None) -> Dict[str, 
     """
     log_error(error, context)
     
-    if isinstance(error, AuthenticationError):
+    if isinstance(error, PydanticValidationError):
+        error_messages = []
+        for e in error.errors():
+            field = e.get("loc", ["unknown"])[0]
+            msg = e.get("msg", "Invalid value")
+            error_messages.append(f"{field}: {msg}")
+        return {
+            "success": False,
+            "error": "Validation error: " + "; ".join(error_messages),
+            "code": 400,
+            "type": "validation_error"
+        }
+    
+    elif isinstance(error, AuthenticationError):
         return {
             "success": False,
             "error": error.message,
@@ -162,7 +176,16 @@ def get_user_message(error: Exception) -> str:
     Returns:
         User-friendly error message
     """
-    if isinstance(error, AuthenticationError):
+    if isinstance(error, PydanticValidationError):
+        # Extract and format Pydantic validation errors
+        error_messages = []
+        for e in error.errors():
+            field = e.get("loc", ["unknown"])[0]
+            msg = e.get("msg", "Invalid value")
+            error_messages.append(f"{field}: {msg}")
+        return "Validation error: " + "; ".join(error_messages)
+    
+    elif isinstance(error, AuthenticationError):
         return "Authentication failed. Please check your credentials."
     
     elif isinstance(error, AuthorizationError):

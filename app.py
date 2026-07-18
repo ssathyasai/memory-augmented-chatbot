@@ -89,6 +89,19 @@ def main():
     # Initialize database connections
     initialize_connections()
     
+    # Display connection status in sidebar
+    st.sidebar.markdown("### Connection Status")
+    if mongodb_manager.is_connected():
+        st.sidebar.success("✅ MongoDB Connected")
+    else:
+        st.sidebar.error("❌ MongoDB Disconnected")
+    
+    if neo4j_manager.is_connected():
+        st.sidebar.success("✅ Neo4j Connected")
+    else:
+        st.sidebar.warning("⚠️ Neo4j Disconnected (KG features disabled)")
+    st.sidebar.markdown("---")
+    
     # Check authentication
     if not is_authenticated():
         # Show login/register page
