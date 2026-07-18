@@ -4,6 +4,7 @@ streamlit>=1.31.0
 # LLM & AI
 langchain>=0.1.0
 langchain-groq>=0.0.1
+langchain-text-splitters>=0.0.1
 langgraph>=0.0.20
 groq>=0.4.0
 
