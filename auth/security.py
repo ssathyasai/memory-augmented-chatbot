@@ -1,14 +1,29 @@
 """Password hashing and security utilities."""
 
-from passlib.context import CryptContext
+import hashlib
+import bcrypt
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def _preprocess_password(password: str) -> bytes:
+    """
+    Preprocess password to handle bcrypt's 72-byte limit.
+    Hashes password with SHA-256 first to get a fixed-size input.
+    
+    Args:
+        password: Plain text password
+    
+    Returns:
+        Preprocessed password bytes
+    """
+    # Encode password to bytes
+    password_bytes = password.encode("utf-8")
+    # Hash with SHA-256 to get a fixed-size input (32 bytes)
+    return hashlib.sha256(password_bytes).digest()
 
 
 def hash_password(password: str) -> str:
     """
-    Hash a password using bcrypt.
+    Hash a password using bcrypt (with SHA-256 preprocessing for long passwords).
     
     Args:
         password: Plain text password
@@ -16,7 +31,12 @@ def hash_password(password: str) -> str:
     Returns:
         Hashed password
     """
-    return pwd_context.hash(password)
+    processed = _preprocess_password(password)
+    # Generate salt and hash
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(processed, salt)
+    # Return as string
+    return hashed.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -30,4 +50,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if password matches, False otherwise
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    processed = _preprocess_password(plain_password)
+    # Verify
+    return bcrypt.checkpw(processed, hashed_password.encode("utf-8"))

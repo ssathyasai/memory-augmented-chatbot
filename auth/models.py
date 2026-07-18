@@ -12,13 +12,15 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     """Model for user registration."""
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=8, max_length=128)
     
     @validator('password')
     def validate_password(cls, v):
         """Validate password strength."""
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
+        if len(v) > 128:
+            raise ValueError('Password must be at most 128 characters long')
         if not any(c.isupper() for c in v):
             raise ValueError('Password must contain at least one uppercase letter')
         if not any(c.islower() for c in v):
@@ -88,13 +90,15 @@ class TokenResponse(BaseModel):
 class PasswordChange(BaseModel):
     """Model for password change."""
     current_password: str
-    new_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=8, max_length=128)
     
     @validator('new_password')
     def validate_password(cls, v):
         """Validate password strength."""
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
+        if len(v) > 128:
+            raise ValueError('Password must be at most 128 characters long')
         if not any(c.isupper() for c in v):
             raise ValueError('Password must contain at least one uppercase letter')
         if not any(c.islower() for c in v):
