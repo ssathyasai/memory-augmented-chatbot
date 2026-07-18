@@ -79,6 +79,7 @@ class RAGPipeline:
         self,
         question: str,
         top_k: int = None,
+        similarity_threshold: float = None,
         include_sources: bool = True,
         conversation_history: List[Dict[str, str]] = None,
         user_preferences: str = None
@@ -89,6 +90,7 @@ class RAGPipeline:
         Args:
             question: User's question
             top_k: Number of documents to retrieve
+            similarity_threshold: Minimum similarity score for retrieval
             include_sources: Whether to include source citations
             conversation_history: Optional conversation history for direct LLM
             user_preferences: Optional user preferences block to prepend
@@ -99,7 +101,7 @@ class RAGPipeline:
         try:
             # Retrieve relevant documents
             logger.info(f"Processing query: {question[:100]}...")
-            retrieved_docs = self.retriever.retrieve(question, top_k=top_k)
+            retrieved_docs = self.retriever.retrieve(question, top_k=top_k, similarity_threshold=similarity_threshold)
             
             if retrieved_docs:
                 # Build context from retrieved documents

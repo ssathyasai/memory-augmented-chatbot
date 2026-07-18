@@ -105,9 +105,16 @@ class DocumentProcessor:
             logger.info(f"Parsing document: {filename}")
             content = self.parser.parse(file_bytes, file_type)
             
-            # Chunk text
-            logger.info(f"Chunking document: {filename}")
-            chunks = self.chunker.chunk_text(content)
+            # Load user settings for chunk size and overlap
+            user_doc = self.db.users.find_one({"_id": ObjectId(user_id)})
+            user_settings = user_doc.get("settings", {}) if user_doc else {}
+            chunk_size = user_settings.get("chunk_size", settings.CHUNK_SIZE)
+            chunk_overlap = user_settings.get("chunk_overlap", settings.CHUNK_OVERLAP)
+            
+            # Chunk text using user-specific settings
+            logger.info(f"Chunking document: {filename} with size={chunk_size}, overlap={chunk_overlap}")
+            custom_chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            chunks = custom_chunker.chunk_text(content)
             
             # Update document
             self.db.documents.update_one(

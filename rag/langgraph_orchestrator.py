@@ -49,9 +49,28 @@ class HybridOrchestrator:
             history = state['messages'][:-1]
             user_prefs = state.get('user_preferences', '')
             
+            # Load user settings from MongoDB
+            from config.database import get_database
+            from bson import ObjectId
+            db = get_database()
+            user_settings = {}
+            if db is not None:
+                try:
+                    user_doc = db.users.find_one({"_id": ObjectId(self.user_id)})
+                    if user_doc:
+                        user_settings = user_doc.get("settings", {})
+                except Exception as e:
+                    logger.error(f"Error loading user settings in RAG query: {e}")
+            
+            top_k = user_settings.get("top_k", settings.TOP_K_RESULTS)
+            similarity_threshold = user_settings.get("similarity_threshold", settings.SIMILARITY_THRESHOLD)
+            show_sources = user_settings.get("show_sources", True)
+            
             result = self.rag_pipeline.query(
                 question, 
-                top_k=settings.TOP_K_RESULTS,
+                top_k=top_k,
+                similarity_threshold=similarity_threshold,
+                include_sources=show_sources,
                 conversation_history=history,
                 user_preferences=user_prefs
             )

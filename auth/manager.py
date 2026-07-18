@@ -218,7 +218,7 @@ class AuthManager:
                 {"_id": ObjectId(user_id)},
                 {"$set": {"settings": settings}}
             )
-            return result.modified_count > 0
+            return result.matched_count > 0
         
         except Exception as e:
             logger.error(f"Error updating user settings: {e}")
