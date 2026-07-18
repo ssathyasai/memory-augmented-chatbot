@@ -126,12 +126,6 @@ with col1:
         ["Light", "Dark", "Auto"],
         index=["light", "dark", "auto"].index(user.settings.get("theme", "light"))
     )
-    
-    language = st.selectbox(
-        "Language",
-        ["English", "Spanish", "French", "German"],
-        index=0
-    )
 
 with col2:
     notifications = st.checkbox(
@@ -151,7 +145,6 @@ if st.button("💾 Save All Settings", type="primary", use_container_width=True)
         # Update settings
         new_settings = {
             "theme": theme.lower(),
-            "language": language.lower(),
             "notifications": notifications,
             "show_sources": show_sources,
             "top_k": top_k,
@@ -159,6 +152,9 @@ if st.button("💾 Save All Settings", type="primary", use_container_width=True)
             "similarity_threshold": similarity_threshold,
             "chunk_overlap": chunk_overlap
         }
+        # Retain language settings if already present in DB
+        if "language" in user.settings:
+            new_settings["language"] = user.settings["language"]
         
         success = auth_manager.update_user_settings(user.id, new_settings)
         

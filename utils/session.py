@@ -83,6 +83,59 @@ def require_auth():
         st.warning("Please log in to access this page. Redirecting to login...")
         st.switch_page("app.py")
         st.stop()
+    apply_theme()
+
+
+def apply_theme():
+    """Apply the user's selected theme dynamically via CSS injection."""
+    user = get_current_user()
+    if not user or not user.settings:
+        return
+    
+    theme = user.settings.get("theme", "auto").lower()
+    if theme == "dark":
+        st.markdown("""
+            <style>
+                /* Dark Mode Theme Overrides */
+                html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+                    background-color: #0E1117 !important;
+                    color: #FAFAFA !important;
+                }
+                [data-testid="stSidebar"] {
+                    background-color: #262730 !important;
+                }
+                .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
+                    color: #FAFAFA !important;
+                    background-color: #1E1E24 !important;
+                }
+                h1, h2, h3, h4, h5, h6, label, p, span {
+                    color: #FAFAFA !important;
+                }
+                div[data-testid="stForm"] {
+                    border-color: #333333 !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+    elif theme == "light":
+        st.markdown("""
+            <style>
+                /* Light Mode Theme Overrides */
+                html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+                    background-color: #FFFFFF !important;
+                    color: #31333F !important;
+                }
+                [data-testid="stSidebar"] {
+                    background-color: #F0F2F6 !important;
+                }
+                .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
+                    color: #31333F !important;
+                    background-color: #F8FAFC !important;
+                }
+                h1, h2, h3, h4, h5, h6, label, p, span {
+                    color: #31333F !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
 
 
 def get_user_id() -> Optional[str]:
