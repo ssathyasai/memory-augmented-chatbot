@@ -125,8 +125,8 @@ class DocumentProcessor:
                 from knowledge_graph.manager import KnowledgeGraphManager
                 logger.info(f"Extracting KG entities and relationships from document: {filename}")
                 kg_mgr = KnowledgeGraphManager(user_id)
-                # Process the first 15,000 characters to build graph entities
-                kg_mgr.process_text(content[:15000])
+                # Process the first 15,000 characters to build graph entities, passing document_id
+                kg_mgr.process_text(content[:15000], document_id=doc_id)
             except Exception as e:
                 logger.error(f"Error building Knowledge Graph for document {filename}: {e}")
                 
@@ -228,6 +228,13 @@ class DocumentProcessor:
             
             if result.deleted_count > 0:
                 logger.info(f"Document deleted: {doc_id}")
+                # Sync deletion: remove document relationships from Neo4j
+                try:
+                    from knowledge_graph.manager import KnowledgeGraphManager
+                    kg_mgr = KnowledgeGraphManager(user_id)
+                    kg_mgr.kg.delete_document_relations(doc_id)
+                except Exception as e:
+                    logger.error(f"Error deleting Neo4j document relations: {e}")
                 return True
             
             return False

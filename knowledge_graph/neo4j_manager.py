@@ -269,6 +269,39 @@ class Neo4jKnowledgeGraph:
             logger.error(f"Error deleting session relationships: {e}")
             return False
             
+    def delete_document_relations(self, document_id: str) -> bool:
+        """
+        Delete all relationships and orphan entities associated with a specific document ID.
+        
+        Args:
+            document_id: The document ID to delete
+            
+        Returns:
+            True if successful
+        """
+        if not self.driver:
+            logger.warning("Neo4j driver not available")
+            return False
+            
+        try:
+            with self.driver.session() as session:
+                # 1. Delete relationships matching user_id and document_id
+                session.run(
+                    "MATCH (s:Entity {user_id: $user_id})-[r:RELATED {document_id: $document_id}]->(t:Entity) DELETE r",
+                    user_id=self.user_id,
+                    document_id=document_id
+                )
+                # 2. Delete orphan entities with no relationships left
+                session.run(
+                    "MATCH (e:Entity {user_id: $user_id}) WHERE NOT (e)-[]-() DELETE e",
+                    user_id=self.user_id
+                )
+            logger.info(f"Deleted relationships and clean up orphans for document: {document_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting document relationships: {e}")
+            return False
+            
     def clear_graph(self) -> bool:
         """
         Clear all entities and relationships associated with the user.

@@ -43,32 +43,41 @@ with col3:
 
 st.markdown("---")
 
-# Rebuild Graph from chats tool
-if st.button("🔄 Analyze Past Chats & Load Graph", type="primary", use_container_width=True):
-    with st.spinner("Analyzing all your past chats to build your Knowledge Graph..."):
-        from config.database import get_database
-        db = get_database()
-        if db is not None:
-            # 1. Clear current graph first to avoid duplicates
+# Graph controls
+col_btn1, col_btn2 = st.columns(2)
+with col_btn1:
+    if st.button("🔄 Analyze Past Chats & Load Graph", type="primary", use_container_width=True):
+        with st.spinner("Analyzing all your past chats to build your Knowledge Graph..."):
+            from config.database import get_database
+            db = get_database()
+            if db is not None:
+                # 1. Clear current graph first to avoid duplicates
+                kg_manager.kg.clear_graph()
+                
+                # 2. Find all chats for this user in MongoDB (in chronological order)
+                user_chats = list(db.chats.find({"user_id": user_id}).sort("timestamp", 1))
+                
+                # 3. Re-process each chat to extract relationships
+                processed_count = 0
+                for chat in user_chats:
+                    question = chat.get("question", "")
+                    answer = chat.get("answer", "")
+                    session_id = chat.get("session_id")
+                    if question and answer:
+                        kg_manager.process_conversation(question, answer, session_id=session_id)
+                        processed_count += 1
+                
+                st.success(f"✅ Load complete! Successfully analyzed {processed_count} past conversation turns and loaded your Knowledge Graph.")
+                st.rerun()
+            else:
+                st.error("Database connection unavailable.")
+
+with col_btn2:
+    if st.button("🗑️ Reset Knowledge Graph", type="secondary", use_container_width=True):
+        with st.spinner("Clearing your Knowledge Graph..."):
             kg_manager.kg.clear_graph()
-            
-            # 2. Find all chats for this user in MongoDB (in chronological order)
-            user_chats = list(db.chats.find({"user_id": user_id}).sort("timestamp", 1))
-            
-            # 3. Re-process each chat to extract relationships
-            processed_count = 0
-            for chat in user_chats:
-                question = chat.get("question", "")
-                answer = chat.get("answer", "")
-                session_id = chat.get("session_id")
-                if question and answer:
-                    kg_manager.process_conversation(question, answer, session_id=session_id)
-                    processed_count += 1
-            
-            st.success(f"✅ Load complete! Successfully analyzed {processed_count} past conversation turns and loaded your Knowledge Graph.")
+            st.success("✅ Knowledge Graph cleared successfully!")
             st.rerun()
-        else:
-            st.error("Database connection unavailable.")
 
 # Tabs for different views
 tab1, tab2, tab3 = st.tabs(["📌 Entities", "🔗 Relationships", "📊 Analytics"])

@@ -69,13 +69,14 @@ JSON Schema:
             logger.error(f"LLM graph extraction failure: {e}")
             return {}
 
-    def process_text(self, text: str, session_id: str = None) -> Dict[str, Any]:
+    def process_text(self, text: str, session_id: str = None, document_id: str = None) -> Dict[str, Any]:
         """
         Process text and extract knowledge (using LLM for rich relations, falling back to spaCy).
         
         Args:
             text: Text to process
             session_id: Optional chat session ID to associate with relationships
+            document_id: Optional document ID to associate with relationships
         
         Returns:
             Dictionary with extraction results
@@ -114,11 +115,18 @@ JSON Schema:
                         # Ensure both entities exist in the graph first
                         self.kg.add_entity(entity_name=src, entity_type="concept")
                         self.kg.add_entity(entity_name=tgt, entity_type="concept")
+                        
+                        props = {}
+                        if session_id:
+                            props["session_id"] = session_id
+                        if document_id:
+                            props["document_id"] = document_id
+                            
                         if self.kg.add_relationship(
                             source_entity=src,
                             target_entity=tgt,
                             relationship_type=rel_type,
-                            properties={"session_id": session_id} if session_id else None
+                            properties=props if props else None
                         ):
                             rels_added += 1
                             
@@ -161,11 +169,18 @@ JSON Schema:
                 for i in range(len(entities) - 1):
                     source = entities[i]["name"]
                     target = entities[i+1]["name"]
+                    
+                    props = {}
+                    if session_id:
+                        props["session_id"] = session_id
+                    if document_id:
+                        props["document_id"] = document_id
+                        
                     if self.kg.add_relationship(
                         source_entity=source,
                         target_entity=target,
                         relationship_type="RELATED_TO",
-                        properties={"session_id": session_id} if session_id else None
+                        properties=props if props else None
                     ):
                         added_relationships += 1
             
