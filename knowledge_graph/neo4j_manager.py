@@ -23,6 +23,8 @@ class Neo4jKnowledgeGraph:
         self.user_id = user_id
         self.driver = neo4j_manager.get_driver()
         self.database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
+        if self.database == "neo4j" and settings.NEO4J_USER and settings.NEO4J_USER != "neo4j":
+            self.database = settings.NEO4J_USER
     
     def add_entity(
         self,

@@ -16,6 +16,13 @@ class Neo4jManager:
     def __init__(self):
         """Initialize Neo4j manager."""
         self._driver: Optional[Driver] = None
+        
+    def _get_db_name(self) -> str:
+        """Get database name, falling back to user on Aura if database is defaulting to 'neo4j'."""
+        database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
+        if database == "neo4j" and settings.NEO4J_USER and settings.NEO4J_USER != "neo4j":
+            return settings.NEO4J_USER
+        return database
     
     def connect(self) -> bool:
         """
@@ -88,7 +95,7 @@ class Neo4jManager:
         
         try:
             # Use execute_query with database_ parameter for Aura
-            database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
+            database = self._get_db_name()
             
             # User node uniqueness constraint
             summary = self._driver.execute_query("""
@@ -141,7 +148,7 @@ class Neo4jManager:
             return []
         
         try:
-            database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
+            database = self._get_db_name()
             records, summary, keys = self._driver.execute_query(
                 query, 
                 parameters or {}, 
@@ -168,7 +175,7 @@ class Neo4jManager:
             return False
         
         try:
-            database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
+            database = self._get_db_name()
             self._driver.execute_query(query, parameters or {}, database_=database)
             return True
         except Exception as e:
