@@ -114,6 +114,7 @@ def search_memories(user_id: str, query: str, limit: int = 5) -> List[Dict[str, 
 
 def update_memory(
     memory_id: str,
+    user_id: str,
     content: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> bool:
@@ -125,25 +126,25 @@ def update_memory(
     if metadata is not None:
         update_data["metadata"] = metadata
     if collection is not None:
-        result = collection.update_one({"_id": memory_id}, {"$set": update_data})
+        result = collection.update_one({"_id": memory_id, "user_id": user_id}, {"$set": update_data})
         return result.modified_count > 0
 
     for item in _local_memories:
-        if item["_id"] == memory_id:
+        if item["_id"] == memory_id and item["user_id"] == user_id:
             item.update(update_data)
             return True
     return False
 
 
-def delete_memory(memory_id: str) -> bool:
+def delete_memory(memory_id: str, user_id: str) -> bool:
     # Memory deletion keeps the dashboard and stored context in sync.
     collection = get_memory_collection()
     if collection is not None:
-        result = collection.delete_one({"_id": memory_id})
+        result = collection.delete_one({"_id": memory_id, "user_id": user_id})
         return result.deleted_count > 0
 
     for index, item in enumerate(_local_memories):
-        if item["_id"] == memory_id:
+        if item["_id"] == memory_id and item["user_id"] == user_id:
             _local_memories.pop(index)
             return True
     return False

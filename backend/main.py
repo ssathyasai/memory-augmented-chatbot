@@ -234,10 +234,14 @@ async def search_memory_endpoint(
 
 
 @app.put("/api/memories/{memory_id}")
-async def update_memory_endpoint(memory_id: str, memory_data: MemoryUpdate):
+async def update_memory_endpoint(
+    memory_id: str,
+    memory_data: MemoryUpdate,
+    user_id: str = Query(..., min_length=1),
+):
     # Memory entries can be edited inline from the dashboard.
     try:
-        success = update_memory(memory_id, memory_data.content, memory_data.metadata)
+        success = update_memory(memory_id, user_id, memory_data.content, memory_data.metadata)
         if not success:
             raise HTTPException(status_code=404, detail="Memory not found")
         return {"status": "success"}
@@ -248,10 +252,13 @@ async def update_memory_endpoint(memory_id: str, memory_data: MemoryUpdate):
 
 
 @app.delete("/api/memories/{memory_id}")
-async def delete_memory_endpoint(memory_id: str):
+async def delete_memory_endpoint(
+    memory_id: str,
+    user_id: str = Query(..., min_length=1),
+):
     # Deleting a memory removes it from the active long-term store.
     try:
-        success = delete_memory(memory_id)
+        success = delete_memory(memory_id, user_id)
         if not success:
             raise HTTPException(status_code=404, detail="Memory not found")
         return {"status": "success"}

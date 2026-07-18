@@ -219,7 +219,7 @@ class ChatbotApp {
                 <small>${new Date(memory.updated_at).toLocaleString()}</small>
             `;
             item.querySelector("button").addEventListener("click", async () => {
-                await this.apiFetch(`/api/memories/${memory.memory_id}`, { method: "DELETE" });
+                await this.apiFetch(`/api/memories/${memory.memory_id}?user_id=${encodeURIComponent(this.userId)}`, { method: "DELETE" });
                 await Promise.all([this.loadMemories(), this.loadAnalytics()]);
             });
             this.memoriesList.appendChild(item);

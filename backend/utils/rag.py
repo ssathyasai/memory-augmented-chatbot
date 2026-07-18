@@ -17,8 +17,16 @@ CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 VECTOR_STORE_PATH = settings.FAISS_DIR
 
-embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
+embeddings = None
 vector_store = None
+
+
+def get_embeddings():
+    """Lazy load embeddings model only when needed."""
+    global embeddings
+    if embeddings is None:
+        embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
+    return embeddings
 
 
 def load_or_initialize_vector_store() -> bool:
@@ -81,11 +89,10 @@ def query_vector_store(query: str, user_id: str, k: int = 4) -> List[Dict[str, A
     if not vector_store:
         return []
 
-    results = vector_store.similarity_search_with_score(query, k=max(k * 3, 10))
+    # Query FAISS directly with a metadata filter to isolate results by user_id
+    results = vector_store.similarity_search_with_score(query, k=k, filter={"user_id": user_id})
     formatted_results: List[Dict[str, Any]] = []
     for doc, score in results:
-        if doc.metadata.get("user_id") != user_id:
-            continue
         formatted_results.append(
             {
                 "source": doc.metadata.get("source", "unknown"),
@@ -94,8 +101,6 @@ def query_vector_store(query: str, user_id: str, k: int = 4) -> List[Dict[str, A
                 "page": doc.metadata.get("page"),
             }
         )
-        if len(formatted_results) >= k:
-            break
     return formatted_results
 
 
