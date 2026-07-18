@@ -147,8 +147,48 @@ Rules:
                     "context": context
                 }
             else:
-                # No documents found - use direct LLM
-                logger.info("No documents found, using direct LLM")
+                # FAISS returned no results — try MongoDB keyword fallback
+                logger.info("FAISS returned 0 results. Attempting MongoDB keyword fallback...")
+                retrieved_docs = self._mongodb_keyword_search(question, top_k=top_k or settings.TOP_K_RESULTS)
+                
+                if retrieved_docs:
+                    logger.info(f"MongoDB fallback returned {len(retrieved_docs)} chunks")
+                    context = self._build_context(retrieved_docs)
+                    system_prompt = f"""You are a helpful AI assistant that answers questions based on the provided context.
+
+{user_preferences or ""}
+
+Rules:
+1. Answer the question using the information from the provided context
+2. If the context doesn't contain enough information, say so clearly
+3. Be concise but complete in your answers
+4. Cite specific parts of the context when relevant"""
+                    
+                    answer = self.llm_client.generate_response(
+                        system_prompt=system_prompt,
+                        user_query=question,
+                        context=context
+                    )
+                    
+                    sources = [
+                        {
+                            "doc_id": doc_id,
+                            "chunk": chunk[:200] + "..." if len(chunk) > 200 else chunk,
+                            "similarity": score
+                        }
+                        for doc_id, chunk, score in retrieved_docs
+                    ] if include_sources else []
+                    
+                    return {
+                        "answer": answer,
+                        "sources": sources,
+                        "has_sources": len(sources) > 0,
+                        "num_sources": len(sources),
+                        "context": context
+                    }
+                
+                # No documents found anywhere - use direct LLM
+                logger.info("No documents found in FAISS or MongoDB, using direct LLM")
                 if conversation_history is None:
                     conversation_history = []
                 truncated = self._truncate_history(conversation_history)
@@ -204,6 +244,61 @@ Rules:
             context = context[:max_chars] + "\n[Context truncated...]"
         
         return context
+    
+    def _mongodb_keyword_search(self, query: str, top_k: int = 5) -> List[Tuple[str, str, float]]:
+        """
+        Fallback keyword search against document chunks stored in MongoDB.
+        Used when the FAISS vector index is empty (e.g. after cloud server restart).
+        
+        Args:
+            query: User's question
+            top_k: Max number of chunks to return
+            
+        Returns:
+            List of (doc_id, chunk_text, score) tuples
+        """
+        try:
+            from config.database import get_database
+            db = get_database()
+            if db is None:
+                return []
+            
+            # Extract keywords from query (lowercase, ignore stop words)
+            stop_words = {"the", "is", "was", "are", "in", "of", "a", "an", "what",
+                          "who", "when", "where", "which", "how", "does", "do",
+                          "did", "and", "or", "to", "for", "on", "at", "by"}
+            query_keywords = [w.lower() for w in query.split() if w.lower() not in stop_words and len(w) > 2]
+            
+            if not query_keywords:
+                query_keywords = query.lower().split()
+            
+            # Fetch all user's documents that have chunks stored in MongoDB
+            docs = list(db.documents.find(
+                {"user_id": self.user_id, "status": "ready", "chunks": {"$exists": True, "$ne": []}}
+            ))
+            
+            results = []
+            for doc in docs:
+                doc_id = str(doc["_id"])
+                chunks = doc.get("chunks", [])
+                
+                for chunk in chunks:
+                    if not chunk:
+                        continue
+                    chunk_lower = chunk.lower()
+                    # Score by how many query keywords appear in this chunk
+                    matches = sum(1 for kw in query_keywords if kw in chunk_lower)
+                    if matches > 0:
+                        score = matches / max(len(query_keywords), 1)
+                        results.append((doc_id, chunk, score))
+            
+            # Sort by score descending and return top_k
+            results.sort(key=lambda x: x[2], reverse=True)
+            return results[:top_k]
+        
+        except Exception as e:
+            logger.error(f"MongoDB keyword fallback search failed: {e}")
+            return []
     
     def chat(
         self,
