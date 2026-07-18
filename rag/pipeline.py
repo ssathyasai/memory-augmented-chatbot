@@ -80,7 +80,8 @@ class RAGPipeline:
         question: str,
         top_k: int = None,
         include_sources: bool = True,
-        conversation_history: List[Dict[str, str]] = None
+        conversation_history: List[Dict[str, str]] = None,
+        user_preferences: str = None
     ) -> Dict[str, Any]:
         """
         Answer a question using RAG (fall back to direct LLM if no docs).
@@ -90,6 +91,7 @@ class RAGPipeline:
             top_k: Number of documents to retrieve
             include_sources: Whether to include source citations
             conversation_history: Optional conversation history for direct LLM
+            user_preferences: Optional user preferences block to prepend
         
         Returns:
             Dictionary with answer and sources
@@ -104,7 +106,9 @@ class RAGPipeline:
                 context = self._build_context(retrieved_docs)
                 
                 # Generate system prompt
-                system_prompt = """You are a helpful AI assistant that answers questions based on the provided context.
+                system_prompt = f"""You are a helpful AI assistant that answers questions based on the provided context.
+
+{user_preferences or ""}
 
 Rules:
 1. Answer the question using the information from the provided context (if available)
@@ -137,7 +141,8 @@ Rules:
                     "answer": answer,
                     "sources": sources,
                     "has_sources": len(sources) > 0,
-                    "num_sources": len(sources)
+                    "num_sources": len(sources),
+                    "context": context
                 }
             else:
                 # No documents found - use direct LLM
@@ -145,9 +150,14 @@ Rules:
                 if conversation_history is None:
                     conversation_history = []
                 truncated = self._truncate_history(conversation_history)
+                
+                system_msg_content = "You are a helpful AI assistant. Answer the user's questions clearly and concisely."
+                if user_preferences:
+                    system_msg_content = f"{user_preferences}\n\n{system_msg_content}"
+                
                 system_msg = {
                     "role": "system",
-                    "content": "You are a helpful AI assistant. Answer the user's questions clearly and concisely."
+                    "content": system_msg_content
                 }
                 messages = [system_msg] + truncated + [{"role": "user", "content": question}]
                 answer = self.llm_client.chat_completion(messages)

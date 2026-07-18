@@ -74,10 +74,14 @@ def initialize_connections():
     # Initialize Neo4j
     if not neo4j_manager.is_connected():
         logger.info("Connecting to Neo4j...")
-        if neo4j_manager.connect():
-            neo4j_manager.create_constraints_and_indexes()
-            logger.info("Neo4j connected and indexed")
-        else:
+        try:
+            if neo4j_manager.connect():
+                neo4j_manager.create_constraints_and_indexes()
+                logger.info("Neo4j connected and indexed")
+            else:
+                logger.warning("Neo4j connection failed - knowledge graph features disabled")
+        except Exception as e:
+            logger.error(f"Error during Neo4j connection: {e}")
             logger.warning("Neo4j connection failed - knowledge graph features disabled")
 
 
@@ -91,15 +95,19 @@ def main():
     
     # Display connection status in sidebar
     st.sidebar.markdown("### Connection Status")
-    if mongodb_manager.is_connected():
+    
+    mongodb_connected = mongodb_manager.is_connected()
+    if mongodb_connected:
         st.sidebar.success("✅ MongoDB Connected")
     else:
         st.sidebar.error("❌ MongoDB Disconnected")
     
-    if neo4j_manager.is_connected():
+    neo4j_connected = neo4j_manager.is_connected()
+    if neo4j_connected:
         st.sidebar.success("✅ Neo4j Connected")
     else:
         st.sidebar.warning("⚠️ Neo4j Disconnected (KG features disabled)")
+    
     st.sidebar.markdown("---")
     
     # Check authentication
@@ -122,7 +130,7 @@ def main():
         
         st.markdown("## Welcome to Your Intelligent Assistant")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.markdown("### 💬 Chat")
@@ -141,6 +149,12 @@ def main():
             st.write("Explore extracted knowledge")
             if st.button("Go to Knowledge Graph", key="nav_kg"):
                 st.switch_page("pages/4_🧠_Knowledge_Graph.py")
+                
+        with col4:
+            st.markdown("### 📊 Evaluation")
+            st.write("View quality and accuracy metrics")
+            if st.button("Go to Evaluation", key="nav_eval"):
+                st.switch_page("pages/6_📊_Evaluation.py")
         
         # Stats
         st.markdown("---")
@@ -172,7 +186,7 @@ def main():
             
             2. **Start Chatting** 💬
                - Go to the Chat page
-               - Ask questions about your documents
+               - Ask questions about your uploaded documents
                - View source citations for answers
             
             3. **Explore Knowledge** 🧠
@@ -184,6 +198,11 @@ def main():
                - Go to Settings page
                - Configure RAG parameters
                - Update your preferences
+            
+            5. **Track Performance & Accuracy** 📊
+               - Go to the Evaluation page
+               - View real-time accuracy and performance graphs
+               - Inspect automated metrics (Faithfulness, Relevance, Correctness) for each query
             """)
 
 

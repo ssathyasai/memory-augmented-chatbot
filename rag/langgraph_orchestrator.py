@@ -6,6 +6,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from .pipeline import RAGPipeline
+from .evaluator import RAGEvaluator
 from knowledge_graph.manager import get_knowledge_graph
 from rag.llm_client import groq_client
 from rag.embeddings import embedding_generator
@@ -45,16 +46,26 @@ class HybridOrchestrator:
         def rag_query(state: Dict) -> Dict:
             """Process query through RAG pipeline."""
             question = state['messages'][-1]['content']
-            result = self.rag_pipeline.query(question, top_k=settings.TOP_K_RESULTS)
+            history = state['messages'][:-1]
+            user_prefs = state.get('user_preferences', '')
+            
+            result = self.rag_pipeline.query(
+                question, 
+                top_k=settings.TOP_K_RESULTS,
+                conversation_history=history,
+                user_preferences=user_prefs
+            )
             
             state['answer'] = result['answer']
             state['sources'] = result.get('sources', [])
             state['query_type'] = 'rag'
+            state['context'] = result.get('context', '')
             return state
         
         def kg_query(state: Dict) -> Dict:
             """Process query through knowledge graph."""
             question = state['messages'][-1]['content']
+            user_prefs = state.get('user_preferences', '')
             
             # Extract entities from the question
             entities = self._extract_entities_from_question(question)
@@ -71,6 +82,8 @@ class HybridOrchestrator:
                 # Generate answer using KG context
                 system_prompt = f"""You are a helpful assistant that answers questions using the provided knowledge graph context.
 
+{user_prefs}
+
 Knowledge Graph Context:
 {kg_context}
 
@@ -85,16 +98,22 @@ Answer the user's question using this structured knowledge."""
                 state['answer'] = answer
                 state['entities'] = kg_entities
                 state['query_type'] = 'kg'
+                state['context'] = kg_context
             else:
                 # Fallback to direct LLM
-                state['answer'] = groq_client.chat_completion(state['messages'])
+                messages = state['messages']
+                if user_prefs:
+                    messages = [{"role": "system", "content": user_prefs}] + messages
+                state['answer'] = groq_client.chat_completion(messages)
                 state['query_type'] = 'direct'
+                state['context'] = ''
             
             return state
         
         def web_query(state: Dict) -> Dict:
             """Process query using web scraping."""
             question = state['messages'][-1]['content']
+            user_prefs = state.get('user_preferences', '')
             
             # Extract search terms from question
             search_terms = self._extract_search_terms(question)
@@ -110,13 +129,16 @@ Answer the user's question using this structured knowledge."""
                         logger.warning(f"Web scrape error for '{term}': {e}")
                 
                 # Build web context
-                state['web_data'] = self._format_web_results(web_results)
+                web_data = self._format_web_results(web_results)
+                state['web_data'] = web_data
                 
                 # Generate answer
                 system_prompt = f"""You are a helpful assistant that answers questions using current web data.
 
+{user_prefs}
+
 Web Data:
-{state['web_data']}
+{web_data}
 
 Answer the user's question using this up-to-date information."""
 
@@ -126,21 +148,51 @@ Answer the user's question using this up-to-date information."""
                     context=""
                 )
                 state['query_type'] = 'web'
+                state['context'] = web_data
             else:
-                state['answer'] = groq_client.chat_completion(state['messages'])
+                messages = state['messages']
+                if user_prefs:
+                    messages = [{"role": "system", "content": user_prefs}] + messages
+                state['answer'] = groq_client.chat_completion(messages)
                 state['query_type'] = 'direct'
+                state['context'] = ''
             
             return state
         
         def direct_query(state: Dict) -> Dict:
             """Direct LLM query without RAG or KG."""
-            state['answer'] = groq_client.chat_completion(state['messages'])
+            messages = state['messages']
+            user_prefs = state.get('user_preferences', '')
+            if user_prefs:
+                messages = [{"role": "system", "content": user_prefs}] + messages
+            state['answer'] = groq_client.chat_completion(messages)
             state['query_type'] = 'direct'
+            state['context'] = ''
             return state
         
         def save_message(state: Dict) -> Dict:
             """Save the chat message to MongoDB."""
-            self._save_chat_message(state['messages'][-1]['content'], state['answer'], state.get('sources', []))
+            question = state['messages'][-1]['content']
+            answer = state['answer']
+            sources = state.get('sources', [])
+            query_type = state.get('query_type', 'direct')
+            context = state.get('context', '')
+            
+            # Run RAG evaluation
+            evaluation = RAGEvaluator.evaluate_query(
+                query=question,
+                context=context,
+                answer=answer,
+                query_type=query_type
+            )
+            state['evaluation'] = evaluation
+            
+            self._save_chat_message(question, answer, sources, query_type, evaluation)
+            
+            # Extract and save user preferences from user query
+            from memory.long_term import LongTermMemoryManager
+            LongTermMemoryManager.extract_and_save_preferences(self.user_id, question)
+            
             return state
         
         def update_recent_chats(state: Dict) -> Dict:
@@ -271,7 +323,7 @@ Answer the user's question using this up-to-date information."""
         
         try:
             db = get_database()
-            if db:
+            if db is not None:
                 recent = list(db.chats.find(
                     {"user_id": self.user_id}
                 ).sort("timestamp", -1).limit(10))
@@ -289,43 +341,61 @@ Answer the user's question using this up-to-date information."""
         
         return []
     
-    def _save_chat_message(self, question: str, answer: str, sources: List[Dict]) -> None:
+    def _save_chat_message(
+        self,
+        question: str,
+        answer: str,
+        sources: List[Dict],
+        query_type: str,
+        evaluation: Dict[str, Any]
+    ) -> None:
         """Save a chat message to MongoDB."""
         from config.database import get_database
         from datetime import datetime
         
         try:
             db = get_database()
-            if db:
+            if db is not None:
                 chat_doc = {
                     "user_id": self.user_id,
                     "question": question,
                     "answer": answer,
                     "sources": sources,
-                    "query_type": "rag",
+                    "query_type": query_type,
+                    "evaluation": evaluation,
                     "timestamp": datetime.utcnow()
                 }
                 db.chats.insert_one(chat_doc)
         except Exception as e:
             logger.error(f"Error saving chat message: {e}")
     
-    def query(self, question: str) -> Dict[str, Any]:
+    def query(self, question: str, chat_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Process a query through the hybrid system.
         
         Args:
             question: User's question
+            chat_history: Optional list of chat turns (messages) for history tracking
         
         Returns:
             Dictionary with answer, sources, query type, etc.
         """
         try:
+            # Fetch user preferences from long-term memory
+            from memory.long_term import LongTermMemoryManager
+            user_prefs = LongTermMemoryManager.get_user_preferences_context(self.user_id)
+            
+            # Reconstruct session history
+            history = chat_history or []
+            
             # Prepare initial state
             state = {
-                "messages": [{"role": "user", "content": question}],
+                "messages": history + [{"role": "user", "content": question}],
                 "user_id": self.user_id,
                 "recent_chats": [],
-                "query_type": ""
+                "query_type": "",
+                "context": "",
+                "user_preferences": user_prefs
             }
             
             # Run the workflow
@@ -339,7 +409,8 @@ Answer the user's question using this up-to-date information."""
                 "query_type": result.get("query_type", ""),
                 "recent_chats": result.get("recent_chats", []),
                 "context": result.get("context", ""),
-                "kg_context": result.get("kg_context", "")
+                "kg_context": result.get("kg_context", ""),
+                "evaluation": result.get("evaluation", None)
             }
         
         except Exception as e:

@@ -84,7 +84,7 @@ with st.sidebar:
     
     if sessions:
         for session in sessions:
-            col1, col2 = st.columns([3, 1])
+            col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
                 session_label = f"{session['message_count']} msgs"
                 if st.button(session_label, key=f"sess_{session['session_id']}", use_container_width=True):
@@ -93,6 +93,16 @@ with st.sidebar:
                     st.rerun()
             with col2:
                 st.caption(session['updated_at'].strftime("%m/%d"))
+            with col3:
+                if st.button("🗑️", key=f"del_{session['session_id']}", help="Delete this specific chat session"):
+                    # Call storage delete directly
+                    st.session_state.memory_manager.storage.delete_conversation(session['session_id'], user_id)
+                    # If this was the current active session, clear session state
+                    if st.session_state.current_session_id == session['session_id']:
+                        st.session_state.current_session_id = None
+                        st.session_state.memory_manager.clear_session()
+                    st.success("Session deleted!")
+                    st.rerun()
     else:
         st.info("No chat history yet")
     
@@ -144,8 +154,11 @@ if prompt := st.chat_input("Ask me anything..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
+                # Load current session history for short-term memory
+                history = st.session_state.memory_manager.get_messages_for_llm()
+                
                 # Use hybrid orchestrator for all queries
-                result = st.session_state.hybrid_orchestrator.query(prompt)
+                result = st.session_state.hybrid_orchestrator.query(prompt, chat_history=history)
                 
                 response = result["answer"]
                 sources = result.get("sources", [])
@@ -157,13 +170,43 @@ if prompt := st.chat_input("Ask me anything..."):
                 
                 # Show metadata
                 with st.expander("🔍 Query Details"):
-                    st.caption(f"**Query Type:** {query_type}")
+                    st.caption(f"**Query Type:** {query_type.upper()}")
                     if query_type == "kg":
                         st.caption(f"**Entities Found:** {len(entities)}")
                         for entity in entities[:3]:
                             st.caption(f"- {entity.get('name', '')} ({entity.get('type', '')})")
                     elif query_type == "web":
                         st.caption("**Web data was used for this answer**")
+                    
+                    # Display evaluations if available
+                    eval_data = result.get("evaluation")
+                    if eval_data:
+                        st.markdown("---")
+                        st.markdown("**🤖 RAG Quality Evaluation**")
+                        
+                        col_f, col_r, col_c = st.columns(3)
+                        with col_f:
+                            st.metric(
+                                label="Faithfulness",
+                                value=f"{eval_data.get('faithfulness', 5.0):.1f} / 5.0",
+                                help=eval_data.get("faithfulness_explanation", "")
+                            )
+                        with col_r:
+                            st.metric(
+                                label="Context Relevance",
+                                value=f"{eval_data.get('context_relevance', 5.0):.1f} / 5.0",
+                                help=eval_data.get("context_relevance_explanation", "")
+                            )
+                        with col_c:
+                            st.metric(
+                                label="Answer Correctness",
+                                value=f"{eval_data.get('answer_correctness', 5.0):.1f} / 5.0",
+                                help=eval_data.get("answer_correctness_explanation", "")
+                            )
+                        
+                        st.caption(f"**Faithfulness reasoning:** {eval_data.get('faithfulness_explanation', '')}")
+                        st.caption(f"**Relevance reasoning:** {eval_data.get('context_relevance_explanation', '')}")
+                        st.caption(f"**Correctness reasoning:** {eval_data.get('answer_correctness_explanation', '')}")
                 
                 # Show sources
                 if show_sources and sources:
@@ -176,7 +219,11 @@ if prompt := st.chat_input("Ask me anything..."):
                 # Save assistant message
                 st.session_state.memory_manager.add_assistant_message(
                     content=response,
-                    sources=[s.get('doc_id', '') for s in sources if s.get('doc_id')]
+                    sources=[s.get('doc_id', '') for s in sources if s.get('doc_id')],
+                    metadata={
+                        "query_type": query_type,
+                        "evaluation": result.get("evaluation")
+                    }
                 )
                 
                 st.rerun()
