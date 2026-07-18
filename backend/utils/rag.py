@@ -1,4 +1,10 @@
 
+import os
+
+# Set local Hugging Face cache directory to load cached model offline
+current_dir = os.path.dirname(os.path.abspath(__file__))
+os.environ["HF_HOME"] = os.path.join(current_dir, "huggingface_cache")
+
 import shutil
 import tempfile
 from pathlib import Path
@@ -35,7 +41,7 @@ def load_or_initialize_vector_store() -> bool:
     if Path(VECTOR_STORE_PATH).exists():
         vector_store = FAISS.load_local(
             VECTOR_STORE_PATH,
-            embeddings,
+            get_embeddings(),
             allow_dangerous_deserialization=True,
         )
         return True
@@ -67,7 +73,7 @@ def process_pdf(file_bytes: bytes, filename: str, user_id: str) -> Dict[str, Any
         if vector_store:
             vector_store.add_documents(chunks)
         else:
-            vector_store = FAISS.from_documents(chunks, embeddings)
+            vector_store = FAISS.from_documents(chunks, get_embeddings())
 
         Path(settings.DATABASE_DIR).mkdir(parents=True, exist_ok=True)
         vector_store.save_local(VECTOR_STORE_PATH)
