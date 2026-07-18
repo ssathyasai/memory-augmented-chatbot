@@ -53,15 +53,17 @@ class RAGPipeline:
         self,
         question: str,
         top_k: int = None,
-        include_sources: bool = True
+        include_sources: bool = True,
+        conversation_history: List[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """
-        Answer a question using RAG.
+        Answer a question using RAG (fall back to direct LLM if no docs).
         
         Args:
             question: User's question
             top_k: Number of documents to retrieve
             include_sources: Whether to include source citations
+            conversation_history: Optional conversation history for direct LLM
         
         Returns:
             Dictionary with answer and sources
@@ -71,55 +73,59 @@ class RAGPipeline:
             logger.info(f"Processing query: {question[:100]}...")
             retrieved_docs = self.retriever.retrieve(question, top_k=top_k)
             
-            if not retrieved_docs:
-                # No documents found - provide general response
+            if retrieved_docs:
+                # Build context from retrieved documents
+                context = self._build_context(retrieved_docs)
+                
+                # Generate system prompt
+                system_prompt = """You are a helpful AI assistant that answers questions based on the provided context.
+
+Rules:
+1. Answer the question using the information from the provided context (if available)
+2. If the context doesn't contain enough information, you can still answer using your general knowledge
+3. Be concise but complete in your answers
+4. Cite specific parts of the context when relevant
+5. If you're not sure, acknowledge the uncertainty"""
+                
+                # Generate response
+                logger.info("Generating response with GROQ LLM using RAG")
+                answer = self.llm_client.generate_response(
+                    system_prompt=system_prompt,
+                    user_query=question,
+                    context=context
+                )
+                
+                # Prepare sources
+                sources = []
+                if include_sources:
+                    sources = [
+                        {
+                            "doc_id": doc_id,
+                            "chunk": chunk[:200] + "..." if len(chunk) > 200 else chunk,
+                            "similarity": score
+                        }
+                        for doc_id, chunk, score in retrieved_docs
+                    ]
+                
                 return {
-                    "answer": "I don't have any relevant documents to answer this question. Please upload documents first.",
+                    "answer": answer,
+                    "sources": sources,
+                    "has_sources": len(sources) > 0,
+                    "num_sources": len(sources)
+                }
+            else:
+                # No documents found - use direct LLM
+                logger.info("No documents found, using direct LLM")
+                if conversation_history is None:
+                    conversation_history = []
+                messages = conversation_history + [{"role": "user", "content": question}]
+                answer = self.llm_client.chat_completion(messages)
+                
+                return {
+                    "answer": answer,
                     "sources": [],
                     "has_sources": False
                 }
-            
-            # Build context from retrieved documents
-            context = self._build_context(retrieved_docs)
-            
-            # Generate system prompt
-            system_prompt = """You are a helpful AI assistant that answers questions based on the provided context.
-
-Rules:
-1. Answer the question using ONLY the information from the provided context
-2. If the context doesn't contain enough information, say so clearly
-3. Be concise but complete in your answers
-4. Cite specific parts of the context when relevant
-5. If you're not sure, acknowledge the uncertainty
-
-Do not make up information that isn't in the context."""
-            
-            # Generate response
-            logger.info("Generating response with GROQ LLM")
-            answer = self.llm_client.generate_response(
-                system_prompt=system_prompt,
-                user_query=question,
-                context=context
-            )
-            
-            # Prepare sources
-            sources = []
-            if include_sources:
-                sources = [
-                    {
-                        "doc_id": doc_id,
-                        "chunk": chunk[:200] + "..." if len(chunk) > 200 else chunk,
-                        "similarity": score
-                    }
-                    for doc_id, chunk, score in retrieved_docs
-                ]
-            
-            return {
-                "answer": answer,
-                "sources": sources,
-                "has_sources": len(sources) > 0,
-                "num_sources": len(sources)
-            }
         
         except Exception as e:
             logger.error(f"Error in RAG pipeline: {e}")

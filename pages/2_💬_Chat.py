@@ -17,7 +17,7 @@ init_session_state()
 require_auth()
 
 # Page config
-st.title("💬 Chat with Your Documents")
+st.title("💬 Chat")
 
 # Initialize RAG and Memory for user
 user_id = get_user_id()
@@ -93,7 +93,7 @@ st.markdown("### 💭 Conversation")
 messages = st.session_state.memory_manager.get_conversation_history()
 
 if not messages:
-    st.info("👋 Start a conversation! Ask me anything about your uploaded documents.")
+    st.info("👋 Start a conversation! Ask me anything - I can also answer questions about your uploaded documents.")
 
 # Display messages
 for msg in messages:
@@ -107,7 +107,7 @@ for msg in messages:
                     st.caption(f"**Source {i}:** {source}")
 
 # Chat input
-if prompt := st.chat_input("Ask me anything about your documents..."):
+if prompt := st.chat_input("Ask me anything..."):
     # Display user message
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -121,10 +121,12 @@ if prompt := st.chat_input("Ask me anything about your documents..."):
             try:
                 if use_rag:
                     # Use RAG pipeline
+                    llm_messages = st.session_state.memory_manager.get_messages_for_llm()
                     result = st.session_state.rag_pipeline.query(
                         question=prompt,
                         top_k=top_k,
-                        include_sources=show_sources
+                        include_sources=show_sources,
+                        conversation_history=llm_messages
                     )
                     
                     response = result["answer"]
