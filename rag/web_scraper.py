@@ -16,7 +16,7 @@ class WebScraper:
         """Initialize the web scraper."""
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0'
         })
     
     def search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
@@ -32,8 +32,10 @@ class WebScraper:
         """
         results = []
         
-        # Try Google search (public search endpoint)
-        search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
+        # Query DuckDuckGo HTML search endpoint (which is extremely friendly to scrapers)
+        import urllib.parse
+        encoded_query = urllib.parse.quote_plus(query)
+        search_url = f"https://html.duckduckgo.com/html/?q={encoded_query}"
         
         try:
             response = self.session.get(search_url, timeout=10)
@@ -42,21 +44,39 @@ class WebScraper:
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # Extract search results
-                for result in soup.select('div.g')[:max_results]:
-                    title_elem = result.select_one('h3')
-                    link_elem = result.select_one('a')
+                items = soup.select('div.result')
+                for item in items[:max_results]:
+                    title_elem = item.select_one('a.result__a')
+                    snippet_elem = item.select_one('a.result__snippet')
                     
-                    if title_elem and link_elem:
-                        title = title_elem.get_text()
-                        link = link_elem.get('href', '')
+                    if title_elem:
+                        title = title_elem.get_text().strip()
+                        raw_link = title_elem.get('href', '')
                         
-                        # Clean the URL
-                        if link.startswith('/url?q='):
-                            link = link.split('?q=')[1].split('&')[0]
+                        # Extract the actual destination URL from the DuckDuckGo redirect link
+                        from urllib.parse import urlparse, parse_qs
+                        parsed = urlparse(raw_link)
+                        qs = parse_qs(parsed.query)
+                        link = qs.get('uddg', [raw_link])[0]
                         
-                        # Fetch the page content
-                        content = self._fetch_page_content(link) if link else ""
+                        if link.startswith('//'):
+                            link = 'https:' + link
+                        elif link.startswith('/'):
+                            link = 'https://duckduckgo.com' + link
+                            
+                        # Use description snippet as base content, and try to fetch page content if possible
+                        snippet = snippet_elem.get_text().strip() if snippet_elem else ""
                         
+                        # Try to fetch full page content (fallback to snippet if it fails or times out)
+                        content = ""
+                        try:
+                            content = self._fetch_page_content(link) if link else ""
+                        except Exception as e:
+                            logger.warning(f"Failed to fetch content for {link}: {e}")
+                            
+                        if not content:
+                            content = snippet
+                            
                         results.append({
                             'title': title,
                             'url': link,
@@ -80,7 +100,7 @@ class WebScraper:
             Page content as text
         """
         try:
-            response = self.session.get(url, timeout=10)
+            response = self.session.get(url, timeout=3)
             
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, 'html.parser')
