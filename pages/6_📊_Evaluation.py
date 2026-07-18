@@ -20,7 +20,7 @@ st.title("📊 RAG Evaluation Dashboard")
 user_id = get_user_id()
 db = get_database()
 
-if not db:
+if db is None:
     st.error("Database connection unavailable. Please check your MongoDB settings.")
     st.stop()
 
