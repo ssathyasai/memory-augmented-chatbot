@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     
     # GROQ
     GROQ_API_KEY: str = Field(..., description="GROQ API key")
-    GROQ_MODEL: str = "mixtral-8x7b-32768"
-    GROQ_MAX_TOKENS: int = 32768
+    GROQ_MODEL: str = "llama3-8b-8192"
+    GROQ_MAX_TOKENS: int = 8192
     GROQ_TEMPERATURE: float = 0.7
     
     # Embeddings
