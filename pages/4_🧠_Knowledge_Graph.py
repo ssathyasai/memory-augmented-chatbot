@@ -85,6 +85,28 @@ tab1, tab2, tab3 = st.tabs(["📌 Entities", "🔗 Relationships", "📊 Analyti
 with tab1:
     st.markdown("### All Entities")
     
+    # If an entity is selected, show its connections at the top of Tab 1
+    selected_entity = st.session_state.get("selected_entity")
+    if selected_entity:
+        with st.container(border=True):
+            st.markdown(f"### 🔗 Connections for **{selected_entity}**")
+            relationships = kg_manager.get_relationships(entity_name=selected_entity)
+            if relationships:
+                for rel in relationships:
+                    col_r1, col_r2, col_r3 = st.columns([2, 1, 2])
+                    with col_r1:
+                        st.markdown(f"**{rel.get('source', 'Unknown')}**")
+                    with col_r2:
+                        st.markdown(f"→ *{rel.get('type', 'related')}* →")
+                    with col_r3:
+                        st.markdown(f"**{rel.get('target', 'Unknown')}**")
+            else:
+                st.info("No connections found for this entity.")
+            if st.button("❌ Close Connections", key="close_connections_tab1"):
+                st.session_state.selected_entity = None
+                st.rerun()
+        st.markdown("---")
+    
     # Filter controls
     col1, col2 = st.columns([2, 1])
     
