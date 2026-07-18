@@ -27,14 +27,11 @@ class Neo4jManager:
         try:
             self._driver = GraphDatabase.driver(
                 settings.NEO4J_URI,
-                auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
-                max_connection_lifetime=3600
+                auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
             )
             
-            # Test connection
-            with self._driver.session() as session:
-                result = session.run("RETURN 1 AS test")
-                result.single()
+            # Test connection using verify_connectivity()
+            self._driver.verify_connectivity()
             
             logger.info("Connected to Neo4j")
             return True
@@ -71,9 +68,7 @@ class Neo4jManager:
             return False
         
         try:
-            with self._driver.session() as session:
-                result = session.run("RETURN 1 AS test")
-                result.single()
+            self._driver.verify_connectivity()
             return True
         except Exception:
             return False
@@ -92,39 +87,41 @@ class Neo4jManager:
             return
         
         try:
-            with self._driver.session() as session:
-                # User node uniqueness constraint
-                session.run("""
-                    CREATE CONSTRAINT user_id_unique IF NOT EXISTS
-                    FOR (u:User) REQUIRE u.id IS UNIQUE
-                """)
-                
-                # Entity node uniqueness constraint
-                session.run("""
-                    CREATE CONSTRAINT entity_id_unique IF NOT EXISTS
-                    FOR (e:Entity) REQUIRE e.id IS UNIQUE
-                """)
-                
-                # Index on entity user_id for isolation
-                session.run("""
-                    CREATE INDEX entity_user_id IF NOT EXISTS
-                    FOR (e:Entity) ON (e.user_id)
-                """)
-                
-                # Index on entity name for search
-                session.run("""
-                    CREATE INDEX entity_name IF NOT EXISTS
-                    FOR (e:Entity) ON (e.name)
-                """)
-                
-                # Index on entity type
-                session.run("""
-                    CREATE INDEX entity_type IF NOT EXISTS
-                    FOR (e:Entity) ON (e.type)
-                """)
-                
-                logger.info("Neo4j constraints and indexes created successfully")
-                
+            # Use execute_query with database_ parameter for Aura
+            database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
+            
+            # User node uniqueness constraint
+            summary = self._driver.execute_query("""
+                CREATE CONSTRAINT user_id_unique IF NOT EXISTS
+                FOR (u:User) REQUIRE u.id IS UNIQUE
+            """, database_=database)
+            
+            # Entity node uniqueness constraint
+            summary = self._driver.execute_query("""
+                CREATE CONSTRAINT entity_id_unique IF NOT EXISTS
+                FOR (e:Entity) REQUIRE e.id IS UNIQUE
+            """, database_=database)
+            
+            # Index on entity user_id for isolation
+            summary = self._driver.execute_query("""
+                CREATE INDEX entity_user_id IF NOT EXISTS
+                FOR (e:Entity) ON (e.user_id)
+            """, database_=database)
+            
+            # Index on entity name for search
+            summary = self._driver.execute_query("""
+                CREATE INDEX entity_name IF NOT EXISTS
+                FOR (e:Entity) ON (e.name)
+            """, database_=database)
+            
+            # Index on entity type
+            summary = self._driver.execute_query("""
+                CREATE INDEX entity_type IF NOT EXISTS
+                FOR (e:Entity) ON (e.type)
+            """, database_=database)
+            
+            logger.info("Neo4j constraints and indexes created successfully")
+            
         except Exception as e:
             logger.error(f"Error creating constraints/indexes: {e}")
     
@@ -144,9 +141,13 @@ class Neo4jManager:
             return []
         
         try:
-            with self._driver.session() as session:
-                result = session.run(query, parameters or {})
-                return [dict(record) for record in result]
+            database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
+            records, summary, keys = self._driver.execute_query(
+                query, 
+                parameters or {}, 
+                database_=database
+            )
+            return [dict(record) for record in records]
         except Exception as e:
             logger.error(f"Error executing query: {e}")
             return []
@@ -167,8 +168,8 @@ class Neo4jManager:
             return False
         
         try:
-            with self._driver.session() as session:
-                session.run(query, parameters or {})
+            database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
+            self._driver.execute_query(query, parameters or {}, database_=database)
             return True
         except Exception as e:
             logger.error(f"Error executing write query: {e}")

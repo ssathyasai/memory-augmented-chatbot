@@ -1,26 +1,27 @@
 # Memory-Augmented Chatbot
 
-A production-ready, intelligent chatbot with RAG (Retrieval-Augmented Generation), knowledge graph integration, and multi-user support. Powered by GROQ LLM and built with Streamlit.
+A production-ready, intelligent chatbot with RAG (Retrieval-Augmented Generation), knowledge graph integration, LangGraph orchestration, and web scraping for current data. Powered by GROQ LLM and built with Streamlit.
 
 ## 🌟 Features
 
 ### Core Capabilities
-- 🔐 **Secure Authentication** - JWT-based auth with bcrypt password hashing
-- 📄 **Document Processing** - Upload and chat with your documents (PDF, DOCX, TXT, MD)
-- 🧠 **RAG System** - Retrieval-Augmented Generation for accurate, context-aware responses
-- 💾 **Memory Management** - Remembers conversation context and user preferences
-- 🕸️ **Knowledge Graph** - Extracts and connects entities from conversations using Neo4j
-- 🔍 **Vector Search** - FAISS-based semantic search across documents
-- 👥 **Multi-User Isolation** - Complete data privacy and user-specific knowledge bases
-- ⚙️ **Configurable Settings** - Customizable RAG parameters and user preferences
+- **Knowledge Graph** - Extracts and connects entities from conversations using Neo4j
+- **Vector Search** - FAISS-based semantic search across documents
+- **LangGraph Orchestration** - Intelligent query routing (RAG + KG + Web + Direct LLM)
+- **Web Scraping** - Fetches current data for up-to-date answers
+- **Recent Chats** - View and manage conversation history with delete functionality
+- **Multi-User Support** - Complete data privacy and user-specific knowledge bases
+- **Configurable Settings** - Customizable RAG parameters and user preferences
 
 ### Technology Stack
 - **Frontend:** Streamlit
 - **LLM:** GROQ (Mixtral-8x7b)
+- **Orchestration:** LangGraph
 - **Embeddings:** HuggingFace Sentence Transformers
 - **Vector Store:** FAISS
-- **Databases:** MongoDB (documents & users), Neo4j (knowledge graph)
+- **Databases:** MongoDB (documents & chats), Neo4j (knowledge graph)
 - **NLP:** spaCy for entity extraction
+- **Web Scraping:** BeautifulSoup for current data
 
 ## 📦 Installation
 
@@ -76,8 +77,9 @@ cp .env.example .env    # Linux/Mac
 JWT_SECRET_KEY="your-random-secret-key-min-32-characters-long"
 MONGODB_URI="mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority"
 NEO4J_URI="neo4j+s://xxxxx.databases.neo4j.io"
-NEO4J_USER="neo4j"
+NEO4J_USER="your-instance-id"
 NEO4J_PASSWORD="your-neo4j-password"
+NEO4J_DATABASE="your-instance-id"
 GROQ_API_KEY="gsk_xxxxxxxxxxxxxxxxxxxxx"
 ```
 
@@ -93,7 +95,8 @@ GROQ_API_KEY="gsk_xxxxxxxxxxxxxxxxxxxxx"
 #### Neo4j Aura (Free)
 1. Go to https://neo4j.com/cloud/aura-free/
 2. Create free instance
-3. Save the connection URI, username, and password
+3. Save the connection URI, username (instance ID), and password
+4. Use instance ID as both NEO4J_USER and NEO4J_DATABASE
 
 #### GROQ API (Free Tier Available)
 1. Go to https://console.groq.com
@@ -142,6 +145,7 @@ The app will open in your browser at `http://localhost:8501`
 - View source citations for answers
 - Adjust RAG settings in sidebar
 - Create new chat sessions or view history
+- Delete all chat history using the sidebar button
 
 ### 4. Explore Knowledge Graph
 - Navigate to **Knowledge Graph** page
@@ -158,7 +162,7 @@ The app will open in your browser at `http://localhost:8501`
 - View usage quota
 - Export your data
 
-## 🏗️ Project Structure
+## 📋 Project Structure
 
 ```
 memory-augmented-chatbot/
@@ -178,11 +182,13 @@ memory-augmented-chatbot/
 │
 ├── rag/                       # RAG pipeline
 │   ├── __init__.py
-│   ├── embeddings.py         # HuggingFace embeddings
-│   ├── vector_store.py       # FAISS vector store
+│   ├── pipeline.py           # Complete RAG flow
 │   ├── retriever.py          # Document retrieval
 │   ├── llm_client.py         # GROQ integration
-│   └── pipeline.py           # Complete RAG flow
+│   ├── embeddings.py         # HuggingFace embeddings
+│   ├── vector_store.py       # FAISS vector store
+│   ├── langgraph_orchestrator.py  # Hybrid routing system
+│   └── web_scraper.py        # Web data fetching
 │
 ├── memory/                    # Memory management
 │   ├── __init__.py
@@ -192,7 +198,7 @@ memory-augmented-chatbot/
 │
 ├── knowledge_graph/           # Knowledge graph
 │   ├── __init__.py
-│   ├── entity_extractor.py  # spaCy NER
+│   ├── entity_extractor.py   # spaCy NER
 │   ├── neo4j_manager.py      # Neo4j operations
 │   └── manager.py            # KG service
 │
@@ -208,7 +214,7 @@ memory-augmented-chatbot/
 │   └── handlers.py           # Error handlers
 │
 ├── pages/                     # Streamlit pages
-│   ├── 2_💬_Chat.py          # Chat interface
+│   ├── 2_💬_Chat.py          # Chat interface with recent chats
 │   ├── 3_📄_Documents.py     # Document management
 │   ├── 4_🧠_Knowledge_Graph.py # KG visualization
 │   └── 5_⚙️_Settings.py       # User settings
@@ -227,6 +233,39 @@ memory-augmented-chatbot/
 ├── .gitignore                # Git exclusions
 ├── run.bat                   # Windows startup script
 └── README.md                 # This file
+```
+
+## 🔄 How It Works
+
+### Hybrid Query Routing
+
+The LangGraph orchestrator intelligently routes queries to the best source:
+
+1. **Web Search** - For current/latest/real-time questions
+2. **Knowledge Graph** - For entity/relationship questions
+3. **RAG Pipeline** - For document-specific questions
+4. **Direct LLM** - For general knowledge questions
+
+### Query Flow Example
+
+```
+User: "What is the latest Python release?"
+
+1. Query Router detects "latest" keyword
+2. Routes to Web Scraper node
+3. Scrapes current Python release info
+4. Returns up-to-date answer with sources
+```
+
+### Knowledge Graph Example
+
+```
+User: "Who is Alan Turing?"
+
+1. Entity extractor identifies "Alan Turing"
+2. Queries Neo4j for entity relationships
+3. Returns: Turing → Turing Machine → Computing
+4. Shows connected concepts in knowledge graph
 ```
 
 ## ⚙️ Configuration
@@ -249,10 +288,11 @@ JWT_EXPIRATION_HOURS=24
 MONGODB_URI="mongodb+srv://..."
 MONGODB_DB_NAME="chatbot_db"
 
-# Neo4j
+# Neo4j (Use instance ID for both user and database)
 NEO4J_URI="neo4j+s://..."
-NEO4J_USER="neo4j"
+NEO4J_USER="your-instance-id"
 NEO4J_PASSWORD="password"
+NEO4J_DATABASE="your-instance-id"
 
 # GROQ
 GROQ_API_KEY="gsk_..."
@@ -291,6 +331,7 @@ python -m spacy download en_core_web_sm
 - Verify Neo4j Aura instance is running
 - Check credentials in `.env`
 - Ensure URI starts with `neo4j+s://`
+- Use instance ID as both NEO4J_USER and NEO4J_DATABASE
 
 ### GROQ API errors
 - Verify API key is correct
@@ -352,47 +393,9 @@ Works on any platform supporting Python 3.10+:
 - Azure App Service
 - DigitalOcean
 
-## 📝 Development
+## 📝 License
 
-### Adding New Features
-
-1. Create models in `[module]/models.py`
-2. Create service logic in `[module]/manager.py`
-3. Create UI in `pages/` or `components/`
-4. Update documentation
-
-### Code Style
-
-- Follow PEP 8
-- Use type hints
-- Add docstrings to functions
-- Log important operations
-- Handle errors gracefully
-
-### Testing
-
-```bash
-# Run tests (when implemented)
-pytest tests/
-
-# Check code quality
-flake8 .
-black .
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-MIT License - see LICENSE file for details
+MIT License - See LICENSE file for details
 
 ## 🙏 Acknowledgments
 
@@ -419,6 +422,7 @@ For issues or questions:
 - [ ] Plugin system
 - [ ] Collaborative features
 - [ ] Document versioning
+- [ ] RAG evaluation framework
 
 ---
 

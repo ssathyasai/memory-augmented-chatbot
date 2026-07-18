@@ -108,6 +108,10 @@ class MongoDBManager:
             self._db.conversations.create_index([("user_id", 1), ("created_at", -1)])
             self._db.conversations.create_index("updated_at")
             
+            # Chats collection indexes (for hybrid orchestrator)
+            self._db.chats.create_index([("user_id", 1), ("timestamp", -1)])
+            self._db.chats.create_index("query_type")
+            
             logger.info("Database indexes created successfully")
             
         except Exception as e:

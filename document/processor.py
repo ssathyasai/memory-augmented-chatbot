@@ -45,8 +45,9 @@ class DocumentProcessor:
         # Check file extension
         file_ext = '.' + filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
         
-        if file_ext not in settings.ALLOWED_EXTENSIONS:
-            raise ValidationError(f"File type not allowed. Allowed: {', '.join(settings.ALLOWED_EXTENSIONS)}")
+        allowed_extensions = [ext.strip() for ext in settings.ALLOWED_EXTENSIONS.split(',')]
+        if file_ext not in allowed_extensions:
+            raise ValidationError(f"File type not allowed. Allowed: {', '.join(allowed_extensions)}")
         
         # Check file size
         max_size_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024

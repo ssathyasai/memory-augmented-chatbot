@@ -1,12 +1,15 @@
-"""Chat page with full RAG integration."""
+"""Chat page with full RAG integration and recent chats management."""
 
 import streamlit as st
 import logging
+from datetime import datetime
 
 from utils.session import require_auth, init_session_state, get_user_id
 from rag.pipeline import RAGPipeline
 from memory.manager import MemoryManager
+from rag.langgraph_orchestrator import get_hybrid_orchestrator
 from errors.handlers import get_user_message
+from config.database import get_database
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,13 @@ if "memory_manager" not in st.session_state:
 # Initialize RAG pipeline in session state
 if "rag_pipeline" not in st.session_state:
     st.session_state.rag_pipeline = RAGPipeline(user_id)
+
+# Initialize hybrid orchestrator in session state
+if "hybrid_orchestrator" not in st.session_state:
+    st.session_state.hybrid_orchestrator = get_hybrid_orchestrator(user_id)
+
+# Database connection
+db = get_database()
 
 # Sidebar
 with st.sidebar:
@@ -70,7 +80,7 @@ with st.sidebar:
     
     # Recent sessions
     st.markdown("### 📚 Recent Chats")
-    sessions = st.session_state.memory_manager.get_user_sessions(limit=5)
+    sessions = st.session_state.memory_manager.get_user_sessions(limit=10)
     
     if sessions:
         for session in sessions:
@@ -85,6 +95,21 @@ with st.sidebar:
                 st.caption(session['updated_at'].strftime("%m/%d"))
     else:
         st.info("No chat history yet")
+    
+    st.markdown("---")
+    
+    # Delete recent chats (MongoDB)
+    st.markdown("### 🗑️ Delete Recent Chats")
+    if st.button("Delete All Chat History", use_container_width=True, type="primary"):
+        if db:
+            try:
+                result = db.chats.delete_many({"user_id": user_id})
+                st.warning(f"Deleted {result.deleted_count} chat messages")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to delete chat history: {e}")
+        else:
+            st.error("Database not available")
 
 # Main chat interface
 st.markdown("### 💭 Conversation")
@@ -119,46 +144,40 @@ if prompt := st.chat_input("Ask me anything..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                if use_rag:
-                    # Use RAG pipeline
-                    llm_messages = st.session_state.memory_manager.get_messages_for_llm()
-                    result = st.session_state.rag_pipeline.query(
-                        question=prompt,
-                        top_k=top_k,
-                        include_sources=show_sources,
-                        conversation_history=llm_messages
-                    )
-                    
-                    response = result["answer"]
-                    sources = [s["doc_id"] for s in result.get("sources", [])]
-                    
-                    # Display response
-                    st.markdown(response)
-                    
-                    # Show sources
-                    if show_sources and result.get("sources"):
-                        with st.expander(f"📄 Sources ({len(result['sources'])})"):
-                            for i, source in enumerate(result['sources'], 1):
-                                st.markdown(f"**Source {i}** (Similarity: {source['similarity']:.2f})")
-                                st.caption(source['chunk'])
-                                st.markdown("---")
-                    
-                    # Save assistant message
-                    st.session_state.memory_manager.add_assistant_message(
-                        content=response,
-                        sources=sources
-                    )
-                else:
-                    # Direct LLM without RAG
-                    llm_messages = st.session_state.memory_manager.get_messages_for_llm()
-                    llm_messages.append({"role": "user", "content": prompt})
-                    
-                    from rag.llm_client import groq_client
-                    response = groq_client.chat_completion(llm_messages)
-                    
-                    # Display and save
-                    st.markdown(response)
-                    st.session_state.memory_manager.add_assistant_message(response)
+                # Use hybrid orchestrator for all queries
+                result = st.session_state.hybrid_orchestrator.query(prompt)
+                
+                response = result["answer"]
+                sources = result.get("sources", [])
+                entities = result.get("entities", [])
+                query_type = result.get("query_type", "unknown")
+                
+                # Display response
+                st.markdown(response)
+                
+                # Show metadata
+                with st.expander("🔍 Query Details"):
+                    st.caption(f"**Query Type:** {query_type}")
+                    if query_type == "kg":
+                        st.caption(f"**Entities Found:** {len(entities)}")
+                        for entity in entities[:3]:
+                            st.caption(f"- {entity.get('name', '')} ({entity.get('type', '')})")
+                    elif query_type == "web":
+                        st.caption("**Web data was used for this answer**")
+                
+                # Show sources
+                if show_sources and sources:
+                    with st.expander(f"📄 Sources ({len(sources)})"):
+                        for i, source in enumerate(sources, 1):
+                            st.markdown(f"**Source {i}** (Similarity: {source.get('similarity', 'N/A'):.2f})")
+                            st.caption(source.get('chunk', source.get('content', '')))
+                            st.markdown("---")
+                
+                # Save assistant message
+                st.session_state.memory_manager.add_assistant_message(
+                    content=response,
+                    sources=[s.get('doc_id', '') for s in sources if s.get('doc_id')]
+                )
                 
                 st.rerun()
             

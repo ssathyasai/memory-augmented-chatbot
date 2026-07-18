@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     
     # Neo4j
     NEO4J_URI: str = Field(..., description="Neo4j connection URI")
-    NEO4J_USER: str = Field(..., description="Neo4j username")
+    NEO4J_USER: str = Field(..., description="Neo4j username (for Aura, use instance ID)")
     NEO4J_PASSWORD: str = Field(..., description="Neo4j password")
+    NEO4J_DATABASE: str = Field(default="neo4j", description="Neo4j database name (for Aura, use instance ID)")
     
     # GROQ
     GROQ_API_KEY: str = Field(..., description="GROQ API key")
@@ -50,7 +51,7 @@ class Settings(BaseSettings):
     
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 10
-    ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".md"]
+    ALLOWED_EXTENSIONS: str = ".pdf,.docx,.txt,.md"
     
     # Rate Limiting
     MAX_QUERIES_PER_MINUTE: int = 30
