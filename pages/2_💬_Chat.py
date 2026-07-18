@@ -97,6 +97,13 @@ with st.sidebar:
                 if st.button("🗑️", key=f"del_{session['session_id']}", help="Delete this specific chat session"):
                     # Call storage delete directly
                     st.session_state.memory_manager.storage.delete_conversation(session['session_id'], user_id)
+                    # Sync deletion: remove session relationships from Neo4j
+                    try:
+                        from knowledge_graph.manager import KnowledgeGraphManager
+                        kg_mgr = KnowledgeGraphManager(user_id)
+                        kg_mgr.kg.delete_session_relations(session['session_id'])
+                    except Exception as e:
+                        logger.error(f"Error deleting Neo4j session relations: {e}")
                     # If this was the current active session, clear session state
                     if st.session_state.current_session_id == session['session_id']:
                         st.session_state.current_session_id = None
@@ -111,9 +118,16 @@ with st.sidebar:
     # Delete recent chats (MongoDB)
     st.markdown("### 🗑️ Delete Recent Chats")
     if st.button("Delete All Chat History", use_container_width=True, type="primary"):
-        if db:
+        if db is not None:
             try:
                 result = db.chats.delete_many({"user_id": user_id})
+                # Sync deletion: clear all graph nodes for the user in Neo4j
+                try:
+                    from knowledge_graph.manager import KnowledgeGraphManager
+                    kg_mgr = KnowledgeGraphManager(user_id)
+                    kg_mgr.kg.clear_graph()
+                except Exception as e:
+                    logger.error(f"Error clearing Neo4j Knowledge Graph: {e}")
                 st.warning(f"Deleted {result.deleted_count} chat messages")
                 st.rerun()
             except Exception as e:
@@ -157,8 +171,12 @@ if prompt := st.chat_input("Ask me anything..."):
                 # Load current session history for short-term memory
                 history = st.session_state.memory_manager.get_messages_for_llm()
                 
-                # Use hybrid orchestrator for all queries
-                result = st.session_state.hybrid_orchestrator.query(prompt, chat_history=history)
+                # Use hybrid orchestrator for all queries, passing current session ID
+                result = st.session_state.hybrid_orchestrator.query(
+                    prompt, 
+                    chat_history=history,
+                    session_id=st.session_state.current_session_id
+                )
                 
                 response = result["answer"]
                 sources = result.get("sources", [])

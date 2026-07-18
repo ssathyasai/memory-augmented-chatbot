@@ -197,7 +197,8 @@ Answer the user's question using this up-to-date information."""
             try:
                 from knowledge_graph.manager import KnowledgeGraphManager
                 kg_mgr = KnowledgeGraphManager(self.user_id)
-                kg_mgr.process_conversation(question, answer)
+                session_id = state.get("session_id")
+                kg_mgr.process_conversation(question, answer, session_id=session_id)
             except Exception as e:
                 logger.error(f"Error updating Knowledge Graph from conversation: {e}")
             
@@ -377,13 +378,14 @@ Answer the user's question using this up-to-date information."""
         except Exception as e:
             logger.error(f"Error saving chat message: {e}")
     
-    def query(self, question: str, chat_history: List[Dict[str, str]] = None) -> Dict[str, Any]:
+    def query(self, question: str, chat_history: List[Dict[str, str]] = None, session_id: str = None) -> Dict[str, Any]:
         """
         Process a query through the hybrid system.
         
         Args:
             question: User's question
             chat_history: Optional list of chat turns (messages) for history tracking
+            session_id: Optional chat session/thread ID
         
         Returns:
             Dictionary with answer, sources, query type, etc.
@@ -403,7 +405,8 @@ Answer the user's question using this up-to-date information."""
                 "recent_chats": [],
                 "query_type": "",
                 "context": "",
-                "user_preferences": user_prefs
+                "user_preferences": user_prefs,
+                "session_id": session_id
             }
             
             # Run the workflow

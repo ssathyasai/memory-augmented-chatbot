@@ -69,12 +69,13 @@ JSON Schema:
             logger.error(f"LLM graph extraction failure: {e}")
             return {}
 
-    def process_text(self, text: str) -> Dict[str, Any]:
+    def process_text(self, text: str, session_id: str = None) -> Dict[str, Any]:
         """
         Process text and extract knowledge (using LLM for rich relations, falling back to spaCy).
         
         Args:
             text: Text to process
+            session_id: Optional chat session ID to associate with relationships
         
         Returns:
             Dictionary with extraction results
@@ -113,7 +114,12 @@ JSON Schema:
                         # Ensure both entities exist in the graph first
                         self.kg.add_entity(entity_name=src, entity_type="concept")
                         self.kg.add_entity(entity_name=tgt, entity_type="concept")
-                        if self.kg.add_relationship(source_entity=src, target_entity=tgt, relationship_type=rel_type):
+                        if self.kg.add_relationship(
+                            source_entity=src,
+                            target_entity=tgt,
+                            relationship_type=rel_type,
+                            properties={"session_id": session_id} if session_id else None
+                        ):
                             rels_added += 1
                             
                 logger.info(f"LLM KG extraction: {len(entities)} entities ({entities_added} added), {len(relationships)} relationships ({rels_added} added)")
@@ -158,7 +164,8 @@ JSON Schema:
                     if self.kg.add_relationship(
                         source_entity=source,
                         target_entity=target,
-                        relationship_type="RELATED_TO"
+                        relationship_type="RELATED_TO",
+                        properties={"session_id": session_id} if session_id else None
                     ):
                         added_relationships += 1
             
@@ -181,20 +188,21 @@ JSON Schema:
                 "error": str(e)
             }
     
-    def process_conversation(self, user_message: str, assistant_message: str):
+    def process_conversation(self, user_message: str, assistant_message: str, session_id: str = None):
         """
         Process a conversation turn and extract knowledge.
         
         Args:
             user_message: User's message
             assistant_message: Assistant's response
+            session_id: Optional session ID associated with this turn
         """
         try:
             # Combine messages
             combined_text = f"{user_message}\n{assistant_message}"
             
             # Process
-            self.process_text(combined_text)
+            self.process_text(combined_text, session_id=session_id)
         
         except Exception as e:
             logger.error(f"Error processing conversation: {e}")

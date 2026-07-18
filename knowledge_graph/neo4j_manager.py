@@ -235,6 +235,62 @@ class Neo4jKnowledgeGraph:
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
             return {"entities": 0, "relationships": 0}
+            
+    def delete_session_relations(self, session_id: str) -> bool:
+        """
+        Delete all relationships and orphan entities associated with a specific session ID.
+        
+        Args:
+            session_id: The session ID to delete
+            
+        Returns:
+            True if successful
+        """
+        if not self.driver:
+            logger.warning("Neo4j driver not available")
+            return False
+            
+        try:
+            with self.driver.session() as session:
+                # 1. Delete relationships matching user_id and session_id
+                session.run(
+                    "MATCH (s:Entity {user_id: $user_id})-[r:RELATED {session_id: $session_id}]->(t:Entity) DELETE r",
+                    user_id=self.user_id,
+                    session_id=session_id
+                )
+                # 2. Delete orphan entities with no relationships left
+                session.run(
+                    "MATCH (e:Entity {user_id: $user_id}) WHERE NOT (e)-[]-() DELETE e",
+                    user_id=self.user_id
+                )
+            logger.info(f"Deleted relationships and clean up orphans for session: {session_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting session relationships: {e}")
+            return False
+            
+    def clear_graph(self) -> bool:
+        """
+        Clear all entities and relationships associated with the user.
+        
+        Returns:
+            True if successful
+        """
+        if not self.driver:
+            logger.warning("Neo4j driver not available")
+            return False
+            
+        try:
+            with self.driver.session() as session:
+                session.run(
+                    "MATCH (e:Entity {user_id: $user_id}) DETACH DELETE e",
+                    user_id=self.user_id
+                )
+            logger.info(f"Cleared entire Knowledge Graph for user: {self.user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error clearing user graph: {e}")
+            return False
 
 
 # Create knowledge graph instance
