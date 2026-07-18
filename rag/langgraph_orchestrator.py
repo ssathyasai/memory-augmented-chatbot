@@ -275,7 +275,16 @@ Answer the user's question using this up-to-date information."""
         if any(word in last_message for word in ["who is", "what is", "relationship", "connected", "knows"]):
             return "kg"
         
-        # Document-specific questions
+        # Document-specific questions: check if user has vectors indexed
+        try:
+            from rag.vector_store import VectorStore
+            vs = VectorStore(self.user_id)
+            if vs.index and vs.index.ntotal > 0:
+                return "rag"
+        except Exception as e:
+            logger.error(f"Error checking vector store in router: {e}")
+        
+        # Default fallback if conversation has history
         if len(state.get('messages', [])) > 1:
             return "rag"
         
