@@ -69,7 +69,7 @@ class EmbeddingGenerator:
             embeddings = self._model.encode(
                 texts,
                 batch_size=batch_size,
-                show_progress_bar=True,
+                show_progress_bar=False,
                 convert_to_numpy=True
             )
             return [emb for emb in embeddings]

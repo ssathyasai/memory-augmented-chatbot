@@ -145,7 +145,11 @@ Rules:
                 if conversation_history is None:
                     conversation_history = []
                 truncated = self._truncate_history(conversation_history)
-                messages = truncated + [{"role": "user", "content": question}]
+                system_msg = {
+                    "role": "system",
+                    "content": "You are a helpful AI assistant. Answer the user's questions clearly and concisely."
+                }
+                messages = [system_msg] + truncated + [{"role": "user", "content": question}]
                 answer = self.llm_client.chat_completion(messages)
                 
                 return {

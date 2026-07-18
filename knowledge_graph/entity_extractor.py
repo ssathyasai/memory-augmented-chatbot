@@ -22,10 +22,10 @@ class EntityExtractor:
                 logger.info("spaCy model loaded")
             except Exception as e:
                 logger.error(f"Error loading spaCy model: {e}")
-                logger.info("Attempting to download model...")
-                import subprocess
-                subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
-                cls._nlp = spacy.load("en_core_web_sm")
+                raise RuntimeError(
+                    "spaCy model 'en_core_web_sm' is not installed. "
+                    "Run: python -m spacy download en_core_web_sm"
+                ) from e
     
     @classmethod
     def extract_entities(cls, text: str) -> List[Dict[str, Any]]:

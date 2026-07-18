@@ -180,26 +180,25 @@ st.markdown("### 📊 Usage & Quota")
 
 col1, col2 = st.columns(2)
 
+# Fetch documents once, safely, before the columns
+from document.processor import document_processor
+try:
+    user_docs = document_processor.get_user_documents(user.id)
+except Exception:
+    user_docs = []
+
 with col1:
-    # Get actual document count
-    from document.processor import document_processor
-    try:
-        user_docs = document_processor.get_user_documents(user.id)
-        doc_count = len(user_docs)
-    except:
-        doc_count = 0
-    
+    doc_count = len(user_docs)
     max_docs = user.quota.get('documents', 100)
     st.metric("Documents", f"{doc_count} / {max_docs}")
     st.progress(min(doc_count / max_docs, 1.0))
 
 with col2:
-    # Calculate storage used
     try:
         total_size_mb = sum(d.metadata.size_bytes for d in user_docs) / (1024 * 1024)
-    except:
+    except Exception:
         total_size_mb = 0
-    
+
     max_storage = user.quota.get('storage_mb', 500)
     st.metric("Storage", f"{total_size_mb:.1f} MB / {max_storage} MB")
     st.progress(min(total_size_mb / max_storage, 1.0))

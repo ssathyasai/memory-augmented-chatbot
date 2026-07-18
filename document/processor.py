@@ -140,7 +140,7 @@ class DocumentProcessor:
             
             return document
         
-        except (ValidationError, DocumentProcessingError):
+        except (ValidationError, DocumentProcessingError) as e:
             # Update document status
             if 'doc_id' in locals():
                 self.db.documents.update_one(
