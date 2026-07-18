@@ -178,16 +178,16 @@ class Neo4jKnowledgeGraph:
         try:
             if entity_name:
                 query = """
-                MATCH (s:Entity {user_id: $user_id, name: $entity_name})-[r:RELATED]->(t:Entity)
+                MATCH (s:Entity {user_id: $user_id, name: $entity_name})-[r:RELATED]->(t:Entity {user_id: $user_id})
                 RETURN s.name AS source, t.name AS target, r.type AS type, properties(r) AS properties
                 UNION
-                MATCH (s:Entity)-[r:RELATED]->(t:Entity {user_id: $user_id, name: $entity_name})
+                MATCH (s:Entity {user_id: $user_id})-[r:RELATED]->(t:Entity {user_id: $user_id, name: $entity_name})
                 RETURN s.name AS source, t.name AS target, r.type AS type, properties(r) AS properties
                 """
                 params = {"user_id": self.user_id, "entity_name": entity_name}
             else:
                 query = """
-                MATCH (s:Entity {user_id: $user_id})-[r:RELATED]->(t:Entity)
+                MATCH (s:Entity {user_id: $user_id})-[r:RELATED]->(t:Entity {user_id: $user_id})
                 RETURN s.name AS source, t.name AS target, r.type AS type, properties(r) AS properties
                 LIMIT 100
                 """
