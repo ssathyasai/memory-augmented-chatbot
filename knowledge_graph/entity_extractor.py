@@ -21,11 +21,23 @@ class EntityExtractor:
                 cls._nlp = spacy.load("en_core_web_sm")
                 logger.info("spaCy model loaded")
             except Exception as e:
-                logger.error(f"Error loading spaCy model: {e}")
-                raise RuntimeError(
-                    "spaCy model 'en_core_web_sm' is not installed. "
-                    "Run: python -m spacy download en_core_web_sm"
-                ) from e
+                logger.warning("spaCy model 'en_core_web_sm' is not installed. Attempting to download automatically...")
+                try:
+                    import subprocess
+                    import sys
+                    subprocess.run(
+                        [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                        check=True,
+                        capture_output=True
+                    )
+                    cls._nlp = spacy.load("en_core_web_sm")
+                    logger.info("spaCy model downloaded and loaded successfully")
+                except Exception as download_err:
+                    logger.error(f"Failed to automatically download spaCy model: {download_err}")
+                    raise RuntimeError(
+                        "spaCy model 'en_core_web_sm' is not installed and auto-download failed. "
+                        "Please run: python -m spacy download en_core_web_sm"
+                    ) from download_err
     
     @classmethod
     def extract_entities(cls, text: str) -> List[Dict[str, Any]]:
