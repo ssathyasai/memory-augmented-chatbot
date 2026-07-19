@@ -1,4 +1,11 @@
-"""Entity extraction from text using spaCy."""
+"""Entity extraction engine using spaCy NER.
+
+Process Flow:
+1. Lazy-loads spaCy `en_core_web_sm` language model with automatic model download fallback.
+2. Processes raw input text through spaCy NLP tokenization and Named Entity Recognition pipeline.
+3. Filters duplicate entities and maps spaCy NER labels (`PERSON`, `ORG`, `GPE`, `DATE`, `MONEY`) to standardized types.
+4. Returns structured list of extracted entity dictionaries containing offsets, names, and entity types.
+"""
 
 import logging
 from typing import List, Dict, Any
