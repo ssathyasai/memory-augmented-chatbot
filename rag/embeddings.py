@@ -1,4 +1,11 @@
-"""Embedding generation using HuggingFace models."""
+"""Vector embedding generator module using SentenceTransformers.
+
+Process Flow:
+1. Implements singleton pattern to lazy-load HuggingFace model (`sentence-transformers/all-MiniLM-L6-v2`).
+2. Converts raw string text queries or document chunks into 384-dimensional dense float32 numpy arrays.
+3. Supports batch embedding generation for fast vector indexing during document ingestion.
+4. Returns embedding dimensions for FAISS index initialization.
+"""
 
 import logging
 from typing import List, Optional
