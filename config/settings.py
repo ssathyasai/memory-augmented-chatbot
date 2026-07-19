@@ -1,4 +1,11 @@
-"""Application settings using Pydantic."""
+"""Application environment configuration settings using Pydantic BaseSettings.
+
+Process Flow:
+1. Automatically reads variables from `.env` file or system environment.
+2. Validates type safety and required parameters (GROQ API key, MongoDB URI, Neo4j credentials, JWT Secret).
+3. Provides default fallbacks for RAG hyperparameters (chunk size, similarity threshold, top_k, embedding model).
+4. Exports a singleton `settings` object used across the application architecture.
+"""
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
