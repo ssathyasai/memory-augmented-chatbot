@@ -1,4 +1,12 @@
-"""Web scraping module for fetching current data."""
+"""Web search and html scraping tool module.
+
+Process Flow:
+1. Formats search query and requests DuckDuckGo HTML endpoint using custom User-Agent headers.
+2. Uses `BeautifulSoup` to parse HTML result cards, extracting titles, redirect URLs, and snippets.
+3. Unpacks actual destination URLs from search redirects using `urllib.parse`.
+4. Attempts deep fetching of full web page content (`_fetch_page_content`) with paragraph text extraction.
+5. Returns structured web context dictionary array `[{title, url, content}]`.
+"""
 
 import logging
 from typing import List, Dict, Any, Optional
