@@ -1,4 +1,11 @@
-"""JWT token management."""
+"""JWT token management module.
+
+Process Flow:
+1. Encodes user payload (`sub`, expiration, issued-at time) into a signed JWT string using HMAC-SHA256.
+2. Decodes JWT strings, verifying secret signatures and expiration constraints.
+3. Extracts and validates user identifiers (`user_id`) from incoming token claims.
+4. Handles token rotation/refresh when existing session tokens approach expiration.
+"""
 
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
