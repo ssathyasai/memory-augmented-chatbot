@@ -1,4 +1,13 @@
-"""Main Streamlit application entry point."""
+"""Main Streamlit application entry point.
+
+Process Flow:
+1. Configures logging handlers to stream logs and save them to 'chatbot.log'.
+2. Sets Streamlit page configuration (title, layout, sidebar state).
+3. Injects custom CSS styles for clean UI components.
+4. Checks and initializes backend connections (MongoDB for storage, Neo4j for Knowledge Graph).
+5. Manages session authentication state; displays the authentication page if unauthenticated.
+6. Renders the main dashboard landing view when authenticated.
+"""
 
 import streamlit as st
 import logging
