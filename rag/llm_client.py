@@ -1,4 +1,11 @@
-"""GROQ LLM client."""
+"""GROQ LLM client wrapper module.
+
+Process Flow:
+1. Initializes `Groq` client using `GROQ_API_KEY`, model selection (`llama-3.1-8b-instant`), temperature, and max token limits.
+2. Performs chat completion requests with system, context, and user role message arrays.
+3. Provides `generate_response` helper method to inject RAG/KG context blocks into prompt payloads.
+4. Catches API connection and rate limit errors, wrapping them in `LLMError`.
+"""
 
 import logging
 from typing import List, Dict
