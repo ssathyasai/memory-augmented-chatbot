@@ -241,12 +241,51 @@ with st.expander("🗑️ Delete All Data"):
     confirm_delete = st.text_input("Type 'DELETE' to confirm", key="confirm_delete")
     
     if st.button("Delete All My Data", type="secondary", disabled=confirm_delete != "DELETE"):
-        st.error("Data deletion functionality will be implemented for production use.")
-        # TODO: Implement data deletion
-        # - Delete all documents
-        # - Delete all conversations
-        # - Delete vector store
-        # - Delete knowledge graph nodes
+        with st.spinner("Deleting all user data..."):
+            try:
+                from config.database import get_database
+                from document.processor import document_processor
+                from memory.storage import conversation_storage
+                from memory.long_term import LongTermMemoryManager
+                from rag.vector_store import VectorStore
+                from knowledge_graph.neo4j_manager import Neo4jKnowledgeGraph
+
+                db = get_database()
+
+                # 1. Delete all user documents from MongoDB
+                document_processor.delete_all_user_documents(user.id)
+
+                # 2. Delete all user conversations & chat logs
+                conversation_storage.delete_all_user_conversations(user.id)
+                if db is not None:
+                    db.chats.delete_many({"user_id": user.id})
+
+                # 3. Delete long-term profile memories
+                LongTermMemoryManager.clear_user_memories(user.id)
+
+                # 4. Clear user vector store
+                vs = VectorStore(user.id)
+                vs.clear()
+
+                # 5. Clear Neo4j Knowledge Graph
+                kg = Neo4jKnowledgeGraph(user.id)
+                kg.clear_graph()
+
+                # 6. Reset Streamlit active session state
+                st.session_state.current_session_id = None
+                st.session_state.messages = []
+                st.session_state.uploaded_docs = []
+                for key in ["memory_manager", "rag_pipeline", "hybrid_orchestrator"]:
+                    if key in st.session_state:
+                        del st.session_state[key]
+
+                st.success("✅ All your data (documents, chat history, vector index, knowledge graph, and profile memories) has been permanently deleted!")
+                st.rerun()
+
+            except Exception as e:
+                logger.error(f"Error deleting user data: {e}")
+                st.error(f"Failed to delete data: {get_user_message(e)}")
+
 
 # Export Data
 with st.expander("📥 Export Data"):

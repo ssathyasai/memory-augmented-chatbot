@@ -247,3 +247,25 @@ class VectorStore:
             "total_documents": len(self.metadata),
             "index_size_mb": os.path.getsize(self.index_path) / (1024 * 1024) if os.path.exists(self.index_path) else 0
         }
+
+    def clear(self) -> bool:
+        """
+        Clear all vectors and metadata for this user.
+        
+        Returns:
+            True if cleared successfully
+        """
+        try:
+            dimension = settings.EMBEDDING_DIMENSION
+            self.index = faiss.IndexFlatL2(dimension)
+            self.metadata = {}
+            if os.path.exists(self.index_path):
+                os.remove(self.index_path)
+            if os.path.exists(self.metadata_path):
+                os.remove(self.metadata_path)
+            logger.info(f"Cleared vector store for user {self.user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error clearing vector store for user {self.user_id}: {e}")
+            return False
+

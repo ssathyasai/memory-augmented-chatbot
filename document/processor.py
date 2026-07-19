@@ -260,6 +260,28 @@ class DocumentProcessor:
             logger.error(f"Error deleting document: {e}")
             return False
 
+    def delete_all_user_documents(self, user_id: str) -> bool:
+        """
+        Delete all documents for a user.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            True if successful
+        """
+        self._ensure_db()
+        
+        try:
+            result = self.db.documents.delete_many({"user_id": user_id})
+            logger.info(f"Deleted {result.deleted_count} documents for user {user_id}")
+            return True
+        
+        except Exception as e:
+            logger.error(f"Error deleting all user documents: {e}")
+            return False
+
 
 # Global document processor instance
 document_processor = DocumentProcessor()
+

@@ -240,6 +240,28 @@ class ConversationStorage:
         
         return conversation.messages[-limit:] if conversation.messages else []
 
+    def delete_all_user_conversations(self, user_id: str) -> bool:
+        """
+        Delete all conversations for a user.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            True if successful
+        """
+        self._ensure_db()
+        
+        try:
+            result = self.db.conversations.delete_many({"user_id": user_id})
+            logger.info(f"Deleted {result.deleted_count} conversations for user {user_id}")
+            return True
+        
+        except Exception as e:
+            logger.error(f"Error deleting all user conversations: {e}")
+            return False
+
 
 # Global conversation storage instance
 conversation_storage = ConversationStorage()
+
