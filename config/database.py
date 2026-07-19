@@ -1,4 +1,11 @@
-"""MongoDB database connection and management."""
+"""MongoDB database connection and management module.
+
+Process Flow:
+1. Establishes connection pool to MongoDB server using URI configured in settings.
+2. Performs admin ping command to verify server health and reachability.
+3. Provides thread-safe Database instance access.
+4. Auto-creates performance and uniqueness indexes across `users`, `documents`, `conversations`, and `chats` collections.
+"""
 
 import logging
 from typing import Optional
