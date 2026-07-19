@@ -1,4 +1,12 @@
-"""File parsers for different document formats."""
+"""Multi-format document file parsers.
+
+Process Flow:
+1. Inspects input file extension (`.pdf`, `.docx`, `.txt`, `.md`).
+2. Parses PDF documents using `pdfplumber` (for layout fidelity) with fallback to `PyPDF2`.
+3. Parses DOCX files extracting both body paragraphs and embedded table cell text.
+4. Decodes TXT and Markdown files attempting UTF-8, Latin-1, and CP1252 encodings.
+5. Returns cleaned extracted raw text content.
+"""
 
 import logging
 from typing import Optional
