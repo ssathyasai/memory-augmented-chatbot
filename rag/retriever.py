@@ -1,4 +1,12 @@
-"""Document retrieval from vector store."""
+"""Document chunk retrieval module.
+
+Process Flow:
+1. Receives user query string, `top_k`, and `similarity_threshold` parameters.
+2. Converts query text into dense vector embedding using `embedding_generator`.
+3. Performs nearest-neighbor vector search in the user's isolated FAISS index (`VectorStore.search`).
+4. Filters retrieved document chunks based on `similarity_threshold` to exclude low-relevance noise.
+5. Returns sorted list of `(doc_id, chunk_text, similarity_score)` tuples.
+"""
 
 import logging
 from typing import List, Tuple
