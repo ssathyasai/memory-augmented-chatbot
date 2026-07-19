@@ -1,4 +1,10 @@
-"""Error handling and logging utilities."""
+"""Error handling and logging utilities module.
+
+Process Flow:
+1. Logs uncaught exceptions alongside contextual metadata and stack traces for unexpected errors.
+2. Catches domain exceptions (`AuthenticationError`, `ValidationError`, `RAGError`, `DatabaseError`, etc.) and formats clean JSON error dictionaries.
+3. Formats user-friendly error strings for Streamlit UI notifications.
+"""
 
 import logging
 import traceback
