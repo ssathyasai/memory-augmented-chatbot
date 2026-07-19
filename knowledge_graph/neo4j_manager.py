@@ -1,4 +1,11 @@
-"""Neo4j knowledge graph operations."""
+"""Neo4j Cypher query execution and graph database storage.
+
+Process Flow:
+1. Executes Cypher `MERGE` queries to upsert user-isolated `Entity` nodes with property dictionaries.
+2. Executes Cypher `MATCH`/`MERGE` queries to create directed `RELATED` edges between entities.
+3. Queries graph entities, relationship types, and node connection counts for visualization and graph analytics.
+4. Executes Cypher deletion statements for document-specific, session-specific, or full-user graph wipe requests.
+"""
 
 import logging
 from typing import List, Dict, Any, Optional
