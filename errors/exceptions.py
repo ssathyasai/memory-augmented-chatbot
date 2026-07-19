@@ -1,4 +1,9 @@
-"""Custom exception classes for the chatbot application."""
+"""Custom exception classes hierarchy for domain-specific error handling.
+
+Process Flow:
+1. Defines root base exception `ChatbotException` carrying human-readable messages and HTTP status codes.
+2. Derives domain exceptions for Authentication (`401`), Authorization (`403`), Validation (`400`), Document Parsing (`400`), RAG (`500`), Knowledge Graph (`500`), Database (`500`), Not Found (`404`), Rate Limit (`429`), and LLM API (`503`).
+"""
 
 
 class ChatbotException(Exception):
