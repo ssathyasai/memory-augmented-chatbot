@@ -53,10 +53,6 @@ class DocumentRetriever:
                 sub_q = p if p.endswith('?') else f"{p}?"
                 sub_queries.append(sub_q)
         
-        # Include original full query if it contains multiple topics
-        if len(sub_queries) > 1 and query not in sub_queries:
-            sub_queries.append(query)
-            
         return sub_queries if sub_queries else [query]
 
     def _keyword_search(self, sub_query: str) -> List[Tuple[str, str, float]]:
@@ -94,7 +90,7 @@ class DocumentRetriever:
                         
         return results
 
-    def _is_similar_content(self, text1: str, text2: str, threshold: float = 0.55) -> bool:
+    def _is_similar_content(self, text1: str, text2: str, threshold: float = 0.40) -> bool:
         """
         Check if two chunk text blocks have high body content overlap (ignoring section numbers/headers).
         
@@ -146,13 +142,16 @@ class DocumentRetriever:
             sub_queries = self._decompose_query(query)
             logger.info(f"Retriever processing {len(sub_queries)} sub-queries for: {query[:80]}...")
             
+            # Dynamically ensure top_k accommodates all sub-queries
+            effective_top_k = max(top_k, len(sub_queries))
+            
             sub_query_candidates: List[List[Tuple[str, str, float]]] = []
             all_raw_candidates: List[Tuple[str, str, float]] = []
             
             for sub_q in sub_queries:
                 # 1. Vector Search
                 query_embedding = self.embedding_gen.generate_embedding(sub_q)
-                vector_results = self.vector_store.search(query_embedding, top_k=max(top_k, 5))
+                vector_results = self.vector_store.search(query_embedding, top_k=max(effective_top_k, 5))
                 
                 # 2. Sparse Keyword Search
                 keyword_results = self._keyword_search(sub_q)
@@ -181,19 +180,19 @@ class DocumentRetriever:
                         is_dup = any(self._is_similar_content(cand[1], sel[1]) for sel in selected_chunks)
                         if not is_dup:
                             selected_chunks.append(cand)
-                            if len(selected_chunks) >= top_k:
+                            if len(selected_chunks) >= effective_top_k:
                                 break
-                if len(selected_chunks) >= top_k:
+                if len(selected_chunks) >= effective_top_k:
                     break
             
             # If we still have slots left, fill with remaining non-duplicate raw candidates
-            if len(selected_chunks) < top_k:
+            if len(selected_chunks) < effective_top_k:
                 all_sorted = sorted(all_raw_candidates, key=lambda x: x[2], reverse=True)
                 for cand in all_sorted:
                     is_dup = any(self._is_similar_content(cand[1], sel[1]) for sel in selected_chunks)
                     if not is_dup:
                         selected_chunks.append(cand)
-                        if len(selected_chunks) >= top_k:
+                        if len(selected_chunks) >= effective_top_k:
                             break
             
             logger.info(f"Retrieved {len(selected_chunks)} distinct non-duplicate chunks across {len(sub_queries)} sub-queries")
