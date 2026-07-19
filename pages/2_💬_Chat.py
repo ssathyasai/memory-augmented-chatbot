@@ -1,4 +1,13 @@
-"""Chat page with full RAG integration and recent chats management."""
+"""Streamlit conversational chat interface page.
+
+Process Flow:
+1. Enforces user authentication via session check.
+2. Initializes user-isolated `MemoryManager`, `RAGPipeline`, and `HybridOrchestrator` instances.
+3. Renders sidebar chat configuration (RAG toggle, Top-K source slider, session switching/deletion).
+4. Fetches and displays current session conversation history.
+5. Captures user prompts, passes query + history + session ID to `HybridOrchestrator`.
+6. Renders assistant responses, document sources, and metadata expandable details.
+"""
 
 import streamlit as st
 import logging
