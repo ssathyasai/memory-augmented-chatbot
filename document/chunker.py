@@ -1,4 +1,11 @@
-"""Text chunking utilities."""
+"""Text chunking utilities module using LangChain RecursiveCharacterTextSplitter.
+
+Process Flow:
+1. Configures target chunk size and character overlap from user settings or defaults.
+2. Uses recursive splitting heuristics (`\n\n`, `\n`, `. `, ` `) to preserve paragraph and sentence context.
+3. Splits raw extracted document text into clean semantic chunks.
+4. Provides a fallback character-based sliding window algorithm if recursive splitting fails.
+"""
 
 import logging
 from typing import List
