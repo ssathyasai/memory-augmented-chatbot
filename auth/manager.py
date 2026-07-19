@@ -1,4 +1,12 @@
-"""Authentication manager for user operations."""
+"""Authentication manager for user operations.
+
+Process Flow:
+1. Validates registration data and verifies uniqueness of user emails in MongoDB.
+2. Hashes raw passwords using bcrypt before saving user documents.
+3. Authenticates login requests by verifying credentials against stored hashes.
+4. Generates signed JWT access tokens upon successful authentication or registration.
+5. Manages user profile settings, application preferences, and quota limits.
+"""
 
 import logging
 from datetime import datetime
