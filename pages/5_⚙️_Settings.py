@@ -1,4 +1,12 @@
-"""Settings page with full functionality."""
+"""Streamlit user profile and RAG configuration settings page.
+
+Process Flow:
+1. Displays authenticated user profile metadata (email, role, account creation date).
+2. Renders password modification form with validation against length and complexity rules.
+3. Renders RAG hyperparameter controls (`top_k`, `chunk_size`, `similarity_threshold`, `chunk_overlap`).
+4. Saves updated settings to user document in MongoDB (`db.users.update_one`).
+5. Displays account storage usage and document quota statistics.
+"""
 
 import streamlit as st
 import logging
