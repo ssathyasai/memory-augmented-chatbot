@@ -1,4 +1,11 @@
-"""Long-term profile preference memory manager."""
+"""Long-term profile preference memory manager module.
+
+Process Flow:
+1. Analyzes user chat turns using GROQ LLM to extract persistent user preferences, constraints, or technology choices.
+2. Formats extracted preferences as key-value pairs and upserts them into `user_profile_memories` collection in MongoDB.
+3. Retrieves stored profile memories and formats them as a system prompt block (`[USER PROFILE & LONG-TERM MEMORY]`) to personalize future LLM answers.
+4. Provides clearing methods to wipe long-term memories upon user request.
+"""
 
 import json
 import logging
