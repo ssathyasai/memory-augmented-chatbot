@@ -1,4 +1,11 @@
-"""FAISS-based vector store with user isolation."""
+"""FAISS-based user-isolated vector store manager module.
+
+Process Flow:
+1. Loads or initializes user-specific FAISS index (`IndexFlatL2`, 384 dimensions) and JSON metadata file on disk.
+2. `add_documents`: Converts embedding list to float32 numpy arrays, appends vectors to FAISS index, and maps chunk text to positional indices in metadata.
+3. `search`: Performs L2 distance search for query vectors and converts distances to similarity scores (`1.0 / (1.0 + distance)`).
+4. `delete_document`: Removes document metadata and calls `_rebuild_index` to purge deleted vectors from FAISS index and disk.
+"""
 
 import logging
 import os
