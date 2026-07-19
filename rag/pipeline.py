@@ -1,4 +1,12 @@
-"""Complete RAG pipeline."""
+"""End-to-end RAG question answering pipeline module.
+
+Process Flow:
+1. `index_document`: Converts document chunks into dense embeddings using `embedding_generator` and persists them into `VectorStore`.
+2. `query`: Executes semantic document retrieval via `DocumentRetriever`.
+3. If FAISS search returns matching chunks above `similarity_threshold`, formats document context block and invokes `groq_client`.
+4. If FAISS search returns 0 results, attempts MongoDB keyword fallback search (`_mongodb_keyword_search`) across document chunks stored in MongoDB.
+5. If no document chunks are found anywhere, falls back to direct LLM response using trimmed conversation history.
+"""
 
 import logging
 from typing import List, Tuple, Dict, Any
