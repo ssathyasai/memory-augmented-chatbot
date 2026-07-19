@@ -1,4 +1,11 @@
-"""RAG evaluation module."""
+"""LLM-as-a-Judge quality evaluation module for RAG responses.
+
+Process Flow:
+1. Constructs evaluation system prompt detailing RAG metrics (Faithfulness, Context Relevance, Answer Correctness).
+2. Sends user query, retrieved context string, generated answer, and query type to GROQ LLM API with JSON mode enabled (`response_format={"type": "json_object"}`).
+3. Parses JSON scores (1.0 to 5.0 scale) and qualitative explanations.
+4. Returns structured evaluation dictionary for MongoDB storage and Streamlit analytics dashboard rendering.
+"""
 
 import json
 import logging
