@@ -1,4 +1,11 @@
-"""Streamlit session state management."""
+"""Streamlit session state management and authentication helper utilities.
+
+Process Flow:
+1. `init_session_state`: Sets up session keys (`user`, `jwt_token`, `current_session_id`, `messages`).
+2. `is_authenticated` & `require_auth`: Verifies active session tokens and forces page redirection to `app.py` if unauthorized.
+3. `set_user` & `clear_session`: Manages login/logout session state persistence.
+4. `apply_theme`: Dynamically injects dark/light CSS themes based on user profile settings stored in MongoDB.
+"""
 
 import streamlit as st
 from typing import Optional
