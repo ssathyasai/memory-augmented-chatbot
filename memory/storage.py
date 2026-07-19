@@ -1,4 +1,11 @@
-"""Conversation storage in MongoDB."""
+"""MongoDB conversation storage module.
+
+Process Flow:
+1. Creates new UUID session documents in MongoDB `conversations` collection.
+2. Pushes new message entries (role, content, timestamp, sources) into session document arrays using MongoDB `$push`.
+3. Retrieves stored user conversations and message turns for LLM prompt reconstruction.
+4. Deletes specific conversation sessions or wipes all session documents for a user upon request.
+"""
 
 import logging
 from datetime import datetime
