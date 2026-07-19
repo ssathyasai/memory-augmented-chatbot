@@ -1,4 +1,11 @@
-"""Neo4j database connection and management."""
+"""Neo4j database connection and graph driver management.
+
+Process Flow:
+1. Instantiates Bolt driver connection using configured URI and credentials (compatible with Neo4j Aura & local instances).
+2. Verifies graph database connectivity using `driver.verify_connectivity()`.
+3. Handles database name resolution for instance multi-tenancy.
+4. Auto-creates Cypher constraints and indexes (`User`, `Document`, `Entity`, `Chunk`, `Concept`) for performant graph traversal.
+"""
 
 import logging
 from typing import Optional, Dict, List, Any
