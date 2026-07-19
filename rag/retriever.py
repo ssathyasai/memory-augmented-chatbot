@@ -94,6 +94,33 @@ class DocumentRetriever:
                         
         return results
 
+    def _is_similar_content(self, text1: str, text2: str, threshold: float = 0.55) -> bool:
+        """
+        Check if two chunk text blocks have high body content overlap (ignoring section numbers/headers).
+        
+        Args:
+            text1: First chunk text
+            text2: Second chunk text
+            threshold: Overlap threshold ratio
+            
+        Returns:
+            True if chunks share duplicate body content
+        """
+        # Remove common section prefixes like "Section 12:", "Section 5: CVR College" etc.
+        t1 = re.sub(r'section\s*\d+:?\s*', '', text1, flags=re.IGNORECASE).lower()
+        t2 = re.sub(r'section\s*\d+:?\s*', '', text2, flags=re.IGNORECASE).lower()
+        
+        words1 = set(w for w in t1.split() if len(w) > 3)
+        words2 = set(w for w in t2.split() if len(w) > 3)
+        
+        if not words1 or not words2:
+            return False
+            
+        intersection = words1.intersection(words2)
+        smaller = min(len(words1), len(words2))
+        overlap = len(intersection) / smaller if smaller > 0 else 0.0
+        return overlap >= threshold
+
     def retrieve(
         self,
         query: str,
@@ -101,7 +128,8 @@ class DocumentRetriever:
         similarity_threshold: float = None
     ) -> List[Tuple[str, str, float]]:
         """
-        Retrieve relevant document chunks using hybrid vector + keyword search and sub-query decomposition.
+        Retrieve relevant document chunks using hybrid vector + keyword search, 
+        sub-query decomposition, round-robin allocation, and semantic content deduplication.
         
         Args:
             query: Search query
@@ -118,7 +146,8 @@ class DocumentRetriever:
             sub_queries = self._decompose_query(query)
             logger.info(f"Retriever processing {len(sub_queries)} sub-queries for: {query[:80]}...")
             
-            chunk_scores: Dict[str, Tuple[str, str, float]] = {}  # chunk_text -> (doc_id, chunk_text, max_score)
+            sub_query_candidates: List[List[Tuple[str, str, float]]] = []
+            all_raw_candidates: List[Tuple[str, str, float]] = []
             
             for sub_q in sub_queries:
                 # 1. Vector Search
@@ -128,25 +157,47 @@ class DocumentRetriever:
                 # 2. Sparse Keyword Search
                 keyword_results = self._keyword_search(sub_q)
                 
-                # Combine results for this sub-query
+                # Combine vector & keyword candidates for sub_q
+                candidates_dict: Dict[str, Tuple[str, str, float]] = {}
                 for doc_id, chunk, score in vector_results + keyword_results:
-                    if chunk not in chunk_scores or score > chunk_scores[chunk][2]:
-                        chunk_scores[chunk] = (doc_id, chunk, score)
+                    if score >= similarity_threshold:
+                        if chunk not in candidates_dict or score > candidates_dict[chunk][2]:
+                            candidates_dict[chunk] = (doc_id, chunk, score)
+                            
+                sorted_sub_candidates = sorted(candidates_dict.values(), key=lambda x: x[2], reverse=True)
+                sub_query_candidates.append(sorted_sub_candidates)
+                all_raw_candidates.extend(sorted_sub_candidates)
             
-            # Sort all unique retrieved chunks by score descending
-            all_candidates = sorted(chunk_scores.values(), key=lambda x: x[2], reverse=True)
+            # Round-Robin Selection with Semantic Content Deduplication
+            selected_chunks: List[Tuple[str, str, float]] = []
             
-            # Filter by similarity threshold
-            filtered_results = [
-                (doc_id, chunk, score)
-                for doc_id, chunk, score in all_candidates
-                if score >= similarity_threshold
-            ]
+            # Round-Robin across sub-queries first to give every sub-question a fair allocation
+            max_rounds = max((len(cands) for cands in sub_query_candidates), default=0)
+            for r in range(max_rounds):
+                for sub_cands in sub_query_candidates:
+                    if r < len(sub_cands):
+                        cand = sub_cands[r]
+                        # Check semantic deduplication against already selected chunks
+                        is_dup = any(self._is_similar_content(cand[1], sel[1]) for sel in selected_chunks)
+                        if not is_dup:
+                            selected_chunks.append(cand)
+                            if len(selected_chunks) >= top_k:
+                                break
+                if len(selected_chunks) >= top_k:
+                    break
             
-            # Limit to top_k results
-            final_results = filtered_results[:top_k]
-            logger.info(f"Retrieved {len(final_results)} relevant chunks across {len(sub_queries)} sub-queries")
-            return final_results
+            # If we still have slots left, fill with remaining non-duplicate raw candidates
+            if len(selected_chunks) < top_k:
+                all_sorted = sorted(all_raw_candidates, key=lambda x: x[2], reverse=True)
+                for cand in all_sorted:
+                    is_dup = any(self._is_similar_content(cand[1], sel[1]) for sel in selected_chunks)
+                    if not is_dup:
+                        selected_chunks.append(cand)
+                        if len(selected_chunks) >= top_k:
+                            break
+            
+            logger.info(f"Retrieved {len(selected_chunks)} distinct non-duplicate chunks across {len(sub_queries)} sub-queries")
+            return selected_chunks
         
         except Exception as e:
             logger.error(f"Error retrieving documents: {e}")
