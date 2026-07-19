@@ -1,4 +1,12 @@
-"""User data models."""
+"""User data models and Pydantic validation schemas.
+
+Process Flow:
+1. Defines `UserBase` schema enforcing email format validation.
+2. Validates registration inputs (`UserCreate`) enforcing password complexity rules (length, uppercase, lowercase, digits).
+3. Defines `UserLogin` and `User` database models.
+4. Provides `UserResponse` schema omitting sensitive password hashes for client responses.
+5. Defines schemas for `TokenResponse` and `PasswordChange`.
+"""
 
 from datetime import datetime
 from typing import Optional, Dict, Any
