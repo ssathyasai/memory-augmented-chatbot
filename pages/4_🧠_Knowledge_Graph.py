@@ -1,4 +1,11 @@
-"""Knowledge Graph page with visualization."""
+"""Streamlit Knowledge Graph visualization and management UI page.
+
+Process Flow:
+1. Connects to `KnowledgeGraphManager` and displays top metrics (Total Entities, Relationships, Entity Types).
+2. Provides a control button to re-analyze historical MongoDB chat logs and populate Neo4j graph nodes.
+3. Provides a reset button to wipe the user's graph network.
+4. Displays tabbed views for entity browsing, relationship inspection, interactive node selection, and graph analytics.
+"""
 
 import streamlit as st
 import logging
