@@ -1,4 +1,9 @@
-"""Memory and conversation models."""
+"""Memory and conversation Pydantic data models.
+
+Process Flow:
+1. Defines `Message` model tracking role (`user`, `assistant`, `system`), timestamp, sources, and metadata.
+2. Defines `Conversation` model for session grouping, message arrays, session timestamps, and total message counts.
+"""
 
 from datetime import datetime
 from typing import List, Dict, Any, Optional
