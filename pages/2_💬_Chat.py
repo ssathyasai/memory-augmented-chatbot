@@ -120,7 +120,9 @@ with st.sidebar:
     if st.button("Delete All Chat History", use_container_width=True, type="primary"):
         if db is not None:
             try:
-                result = db.chats.delete_many({"user_id": user_id})
+                result_chats = db.chats.delete_many({"user_id": user_id})
+                result_convs = db.conversations.delete_many({"user_id": user_id})
+                
                 # Sync deletion: clear all graph nodes for the user in Neo4j
                 try:
                     from knowledge_graph.manager import KnowledgeGraphManager
@@ -141,7 +143,7 @@ with st.sidebar:
                     if key in st.session_state:
                         del st.session_state[key]
                 
-                st.warning(f"Deleted {result.deleted_count} chat messages and cleared memories.")
+                st.warning(f"Deleted {result_chats.deleted_count} logs and {result_convs.deleted_count} conversation sessions.")
                 st.rerun()
             except Exception as e:
                 st.error(f"Failed to delete chat history: {e}")
