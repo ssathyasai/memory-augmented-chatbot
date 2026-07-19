@@ -1,4 +1,12 @@
-"""Knowledge graph manager."""
+"""Knowledge graph workflow manager module.
+
+Process Flow:
+1. Receives raw document text or conversation turn strings for graph indexing.
+2. Uses LLM-based extraction (`_extract_graph_via_llm`) with JSON schema enforcement to parse semantic entities and typed relationships (`WORKS_AT`, `KNOWS`, `RELATED_TO`).
+3. Falls back to spaCy Named Entity Recognition if LLM extraction is unavailable.
+4. Writes entities and relationships to user-isolated Neo4j database using `Neo4jKnowledgeGraph`.
+5. Processes chat conversation turns in real-time to continuously expand the user's graph network.
+"""
 
 import json
 import logging
