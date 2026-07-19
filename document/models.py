@@ -1,4 +1,10 @@
-"""Document data models."""
+"""Document data structures and Pydantic models.
+
+Process Flow:
+1. Defines `DocumentMetadata` for file size, page count, language, and author tracking.
+2. Defines `DocumentChunk` schema for storing indexed chunk content with positional indexes.
+3. Defines top-level `Document` model tracking upload status (`pending`, `processing`, `ready`, `error`), total chunks, and raw content.
+"""
 
 from datetime import datetime
 from typing import List, Dict, Any, Optional
