@@ -128,7 +128,20 @@ with st.sidebar:
                     kg_mgr.kg.clear_graph()
                 except Exception as e:
                     logger.error(f"Error clearing Neo4j Knowledge Graph: {e}")
-                st.warning(f"Deleted {result.deleted_count} chat messages")
+                
+                # Clear long-term memory facts extracted from past chats
+                try:
+                    from memory.long_term import LongTermMemoryManager
+                    LongTermMemoryManager.clear_user_memories(user_id)
+                except Exception as e:
+                    logger.error(f"Error clearing long-term memories: {e}")
+                
+                # Reset orchestrator and session state memory instances
+                for key in ["hybrid_orchestrator", "memory_manager", "current_session_id"]:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                
+                st.warning(f"Deleted {result.deleted_count} chat messages and cleared memories.")
                 st.rerun()
             except Exception as e:
                 st.error(f"Failed to delete chat history: {e}")

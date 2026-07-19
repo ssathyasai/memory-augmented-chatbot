@@ -175,14 +175,44 @@ class VectorStore:
         """
         try:
             if doc_id in self.metadata:
-                # Note: FAISS doesn't support deletion, so we just remove metadata
-                # In production, you'd rebuild the index periodically
                 del self.metadata[doc_id]
+                self._rebuild_index()
                 self._save()
-                logger.info(f"Removed metadata for document {doc_id}")
+                logger.info(f"Removed metadata and rebuilt FAISS index for document {doc_id}")
         
         except Exception as e:
             logger.error(f"Error deleting document from vector store: {e}")
+
+    def _rebuild_index(self):
+        """Rebuild FAISS index from remaining document metadata."""
+        try:
+            dimension = settings.EMBEDDING_DIMENSION
+            new_index = faiss.IndexFlatL2(dimension)
+            
+            all_chunks = []
+            doc_chunk_map = {}
+            for d_id, d_meta in list(self.metadata.items()):
+                chunks = d_meta.get("chunks", [])
+                doc_chunk_map[d_id] = len(chunks)
+                all_chunks.extend(chunks)
+            
+            if all_chunks:
+                from rag.embeddings import embedding_generator
+                embeddings = embedding_generator.generate_embeddings(all_chunks)
+                embeddings_array = np.array(embeddings).astype('float32')
+                new_index.add(embeddings_array)
+                
+                # Update chunk indices in metadata
+                start_idx = 0
+                for d_id, count in doc_chunk_map.items():
+                    self.metadata[d_id]["chunk_indices"] = list(range(start_idx, start_idx + count))
+                    start_idx += count
+            
+            self.index = new_index
+            logger.info(f"Rebuilt FAISS index with {self.index.ntotal} total vectors.")
+        
+        except Exception as e:
+            logger.error(f"Error rebuilding FAISS index: {e}")
     
     def _save(self):
         """Save index and metadata to disk."""
