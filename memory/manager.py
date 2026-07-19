@@ -1,4 +1,12 @@
-"""Memory manager for conversations."""
+"""High-level conversation memory orchestration manager.
+
+Process Flow:
+1. Manages creation, switching, and tracking of active user session IDs.
+2. Adds user and assistant chat messages into session storage (`ConversationStorage`).
+3. Fetches recent conversation turns formatted for LLM API prompts or Streamlit UI chat display.
+4. Formats string representation of chat context for prompt engineering.
+5. Deletes active or historical conversation sessions.
+"""
 
 import logging
 from typing import List, Dict, Any
