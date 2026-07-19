@@ -62,7 +62,7 @@ with st.sidebar:
     # RAG settings
     st.markdown("### RAG Settings")
     use_rag = st.checkbox("Use Document Retrieval", value=True, help="Search your documents for answers")
-    top_k = st.slider("Number of Sources", 1, 10, 5, help="How many document chunks to retrieve")
+    top_k = st.slider("Number of Sources", 1, 20, 8, help="How many document chunks to retrieve")
     show_sources = st.checkbox("Show Sources", value=True, help="Display source citations")
     
     st.markdown("---")
