@@ -199,11 +199,13 @@ if prompt := st.chat_input("Ask me anything..."):
                 # Load current session history for short-term memory
                 history = st.session_state.memory_manager.get_messages_for_llm()
                 
-                # Use hybrid orchestrator for all queries, passing current session ID
+                # Use hybrid orchestrator for all queries, passing current session ID and sidebar settings
                 result = st.session_state.hybrid_orchestrator.query(
                     prompt, 
                     chat_history=history,
-                    session_id=st.session_state.current_session_id
+                    session_id=st.session_state.current_session_id,
+                    top_k=top_k,
+                    use_rag=use_rag
                 )
                 
                 response = result["answer"]

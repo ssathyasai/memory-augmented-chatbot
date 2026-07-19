@@ -74,7 +74,7 @@ class HybridOrchestrator:
                 except Exception as e:
                     logger.error(f"Error loading user settings in RAG query: {e}")
             
-            top_k = user_settings.get("top_k", settings.TOP_K_RESULTS)
+            top_k = state.get("top_k") or user_settings.get("top_k", settings.TOP_K_RESULTS)
             similarity_threshold = user_settings.get("similarity_threshold", settings.SIMILARITY_THRESHOLD)
             show_sources = user_settings.get("show_sources", True)
             
@@ -279,6 +279,7 @@ Answer the user's question using this up-to-date information."""
     def _route_query(self, state: Dict) -> str:
         """Determine which path to take based on query analysis."""
         last_message = state['messages'][-1]['content'].lower() if state.get('messages') else ""
+        use_rag = state.get("use_rag", True)
         
         # Check if user has vectors indexed in vector store
         has_documents = False
@@ -300,12 +301,12 @@ Answer the user's question using this up-to-date information."""
         if any(word in last_message for word in kg_keywords):
             return "kg"
         
-        # 3. If user has indexed documents, route to RAG for document retrieval
-        if has_documents:
+        # 3. If user has indexed documents and use_rag is enabled, route to RAG
+        if use_rag and has_documents:
             return "rag"
         
-        # 4. Default fallback if conversation has history
-        if len(state.get('messages', [])) > 1:
+        # 4. Fallback if conversation has history and use_rag is enabled
+        if use_rag and len(state.get('messages', [])) > 1:
             return "rag"
         
         return "direct"
@@ -428,7 +429,14 @@ Answer the user's question using this up-to-date information."""
         except Exception as e:
             logger.error(f"Error saving chat message: {e}")
     
-    def query(self, question: str, chat_history: List[Dict[str, str]] = None, session_id: str = None) -> Dict[str, Any]:
+    def query(
+        self,
+        question: str,
+        chat_history: List[Dict[str, str]] = None,
+        session_id: str = None,
+        top_k: int = None,
+        use_rag: bool = True
+    ) -> Dict[str, Any]:
         """
         Process a query through the hybrid system.
         
@@ -436,6 +444,8 @@ Answer the user's question using this up-to-date information."""
             question: User's question
             chat_history: Optional list of chat turns (messages) for history tracking
             session_id: Optional chat session/thread ID
+            top_k: Optional number of sources to retrieve
+            use_rag: Whether to enable document retrieval
         
         Returns:
             Dictionary with answer, sources, query type, etc.
@@ -456,7 +466,9 @@ Answer the user's question using this up-to-date information."""
                 "query_type": "",
                 "context": "",
                 "user_preferences": user_prefs,
-                "session_id": session_id
+                "session_id": session_id,
+                "top_k": top_k,
+                "use_rag": use_rag
             }
             
             # Run the workflow

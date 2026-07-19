@@ -89,8 +89,8 @@ with col1:
     top_k = st.slider(
         "Top K Results",
         min_value=1,
-        max_value=10,
-        value=user.settings.get("top_k", 5),
+        max_value=20,
+        value=user.settings.get("top_k", 8),
         help="Number of document chunks to retrieve"
     )
     
@@ -108,8 +108,8 @@ with col2:
         "Similarity Threshold",
         min_value=0.0,
         max_value=1.0,
-        value=user.settings.get("similarity_threshold", 0.7),
-        step=0.1,
+        value=user.settings.get("similarity_threshold", 0.25),
+        step=0.05,
         help="Minimum similarity score for retrieval"
     )
     

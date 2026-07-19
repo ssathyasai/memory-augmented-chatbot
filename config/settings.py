@@ -48,8 +48,8 @@ class Settings(BaseSettings):
     # RAG Configuration
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
-    TOP_K_RESULTS: int = 5
-    SIMILARITY_THRESHOLD: float = 0.3
+    TOP_K_RESULTS: int = 8
+    SIMILARITY_THRESHOLD: float = 0.25
     MAX_CONTEXT_TOKENS: int = 4000
     
     # Vector Store
