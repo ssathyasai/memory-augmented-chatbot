@@ -1,4 +1,9 @@
-"""Error handling package."""
+"""Error handling package initialization.
+
+Process Flow:
+1. Exports custom exception hierarchy classes.
+2. Exports central error handling and logging functions (`handle_error`, `log_error`).
+"""
 
 from .exceptions import (
     ChatbotException,
