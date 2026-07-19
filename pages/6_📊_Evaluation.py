@@ -1,4 +1,11 @@
-"""Evaluation page displaying system performance metrics and quality dashboard."""
+"""Streamlit RAG evaluation dashboard and quality analytics UI page.
+
+Process Flow:
+1. Fetches evaluated chat logs from MongoDB `chats` collection for the authenticated user.
+2. Computes aggregate performance metrics: Faithfulness, Context Relevance, and Answer Correctness.
+3. Renders score progress bars, overall quality grades, and query-type breakdown charts (`rag`, `kg`, `web`, `direct`).
+4. Provides a bulk-evaluation button to evaluate un-graded historical chat logs using `RAGEvaluator`.
+"""
 
 import streamlit as st
 import logging
