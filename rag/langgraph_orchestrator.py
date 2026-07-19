@@ -1,4 +1,16 @@
-"""LangGraph hybrid orchestrator for RAG + Knowledge Graph + Tools routing."""
+"""LangGraph hybrid state graph orchestrator for routing queries across RAG, Knowledge Graph, Web Search, and Direct LLM.
+
+Process Flow:
+1. Receives incoming user query, conversation history, user preferences, and session ID.
+2. Runs conditional routing function `_route_query`:
+   - Checks if user has document vector embeddings indexed in FAISS (`vs.index.ntotal > 0`).
+   - Routes to `rag` node if document vectors exist or history is active.
+   - Routes to `web` node if explicit web search intent keywords are present.
+   - Routes to `kg` node if explicit Knowledge Graph intent keywords are present.
+   - Fallbacks to `direct` LLM node if no vectors or tools apply.
+3. Executes target worker node (`rag_query`, `kg_query`, `web_query`, or `direct_query`).
+4. Executes `save_message` node: runs RAGEvaluator, saves chat turn to MongoDB, extracts user preferences, and updates Neo4j graph.
+"""
 
 import logging
 from typing import List, Dict, Any, Optional
