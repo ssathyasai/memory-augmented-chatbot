@@ -1,4 +1,12 @@
-"""Documents page with full processing integration."""
+"""Streamlit document management and ingestion UI page.
+
+Process Flow:
+1. Renders multi-format file uploader (`.pdf`, `.docx`, `.txt`, `.md`).
+2. Invokes `document_processor.process_document` to validate, parse, chunk, and index files.
+3. Generates vector embeddings and adds chunks to FAISS vector index via `RAGPipeline.index_document`.
+4. Renders user's document repository list with status indicators, chunk metrics, and search filtering.
+5. Provides document deletion handlers that remove records from MongoDB, FAISS vector store, and Neo4j graph.
+"""
 
 import streamlit as st
 import logging
