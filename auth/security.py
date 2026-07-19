@@ -1,4 +1,10 @@
-"""Password hashing and security utilities."""
+"""Password hashing and security utilities.
+
+Process Flow:
+1. Preprocesses plain text passwords using SHA-256 digest to safely handle bcrypt's 72-byte limit.
+2. Generates random salt and hashes password bytes using bcrypt.
+3. Verifies provided plaintext passwords against stored bcrypt hash strings.
+"""
 
 import hashlib
 import bcrypt
