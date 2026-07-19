@@ -1,4 +1,14 @@
-"""Main document processing pipeline."""
+"""Main document processing and lifecycle manager module.
+
+Process Flow:
+1. Validates uploaded file size and extension against allowed application limits.
+2. Creates initial document record with `processing` status in MongoDB.
+3. Invokes `DocumentParser` to extract raw text content from uploaded bytes.
+4. Uses `TextChunker` with user-specific chunk size and overlap parameters to generate chunk lists.
+5. Updates MongoDB document record to `ready` status containing extracted text and chunks.
+6. Passes text to `KnowledgeGraphManager` to populate Neo4j graph entities and relationships.
+7. Deletes document records from MongoDB and syncs relationship removal in Neo4j upon user request.
+"""
 
 import logging
 from datetime import datetime
