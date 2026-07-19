@@ -93,7 +93,8 @@ class HybridOrchestrator:
                 # Query knowledge graph for relationships
                 kg_entities = []
                 for entity in entities:
-                    kg_entities.extend(self.kg_manager.get_entities(entity_type='person'))
+                    matched = self.kg_manager.get_entities(limit=20)
+                    kg_entities.extend(matched)
                 
                 # Build KG context
                 kg_context = self._build_kg_context(kg_entities, entities)
@@ -267,24 +268,31 @@ Answer the user's question using this up-to-date information."""
         """Determine which path to take based on query analysis."""
         last_message = state['messages'][-1]['content'].lower() if state.get('messages') else ""
         
-        # Web-related keywords
-        if any(word in last_message for word in ["current", "latest", "real-time", "news", "today", "recent"]):
-            return "web"
-        
-        # Entity/relationship questions
-        if any(word in last_message for word in ["who is", "what is", "relationship", "connected", "knows"]):
-            return "kg"
-        
-        # Document-specific questions: check if user has vectors indexed
+        # Check if user has vectors indexed in vector store
+        has_documents = False
         try:
             from rag.vector_store import VectorStore
             vs = VectorStore(self.user_id)
             if vs.index and vs.index.ntotal > 0:
-                return "rag"
+                has_documents = True
         except Exception as e:
             logger.error(f"Error checking vector store in router: {e}")
         
-        # Default fallback if conversation has history
+        # 1. Explicit Web-related search intent
+        web_keywords = ["search web", "google search", "online news", "real-time stock", "browse web"]
+        if any(word in last_message for word in web_keywords):
+            return "web"
+        
+        # 2. Explicit Knowledge Graph intent
+        kg_keywords = ["knowledge graph", "graph relation", "entity connections", "how is connected", "node relationship"]
+        if any(word in last_message for word in kg_keywords):
+            return "kg"
+        
+        # 3. If user has indexed documents, route to RAG for document retrieval
+        if has_documents:
+            return "rag"
+        
+        # 4. Default fallback if conversation has history
         if len(state.get('messages', [])) > 1:
             return "rag"
         
