@@ -107,6 +107,17 @@ class Neo4jKnowledgeGraph:
             props = properties or {}
             props["type"] = relationship_type
             
+            # Enforce uniqueness for single-valued relationship types starting from the source
+            single_valued_rels = ["STUDIES_AT", "STUDENT_OF", "STUDIES_IN", "WORKS_AT", "EMPLOYED_BY", "LIVES_IN", "LOCATED_IN"]
+            if relationship_type.upper() in single_valued_rels:
+                delete_query = """
+                MATCH (s:Entity {user_id: $user_id, name: $source})-[r:RELATED {type: $rel_type}]->()
+                DELETE r
+                """
+                with self.driver.session(database=self.database) as session:
+                    session.run(delete_query, user_id=self.user_id, source=source_entity, rel_type=relationship_type)
+                    logger.info(f"Deleted old single-valued relationship '{relationship_type}' starting from '{source_entity}'")
+            
             query = """
             MATCH (s:Entity {user_id: $user_id, name: $source})
             MATCH (t:Entity {user_id: $user_id, name: $target})
