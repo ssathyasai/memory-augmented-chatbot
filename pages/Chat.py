@@ -52,6 +52,26 @@ if "rag_pipeline" not in st.session_state:
 if "hybrid_orchestrator" not in st.session_state:
     st.session_state.hybrid_orchestrator = get_hybrid_orchestrator(user_id)
 
+# Self-healing: Ensure all ready documents in MongoDB are indexed in the vector store
+try:
+    from document.processor import document_processor
+    from rag.vector_store import VectorStore
+    from rag.pipeline import RAGPipeline
+    
+    user_docs = document_processor.get_user_documents(user_id)
+    vs = VectorStore(user_id)
+    missing_docs = [d for d in user_docs if d.status == "ready" and d.id not in vs.metadata]
+    
+    if missing_docs:
+        rag_pipeline = RAGPipeline(user_id)
+        for doc in missing_docs:
+            try:
+                rag_pipeline.index_document(doc.id, doc.chunks)
+            except Exception as e:
+                logger.error(f"Failed to auto-reindex document {doc.id} during Chat page load: {e}")
+except Exception as e:
+    logger.error(f"Error during self-healing check in Chat page: {e}")
+
 # Database connection
 db = get_database()
 

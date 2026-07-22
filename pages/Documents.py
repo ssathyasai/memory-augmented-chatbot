@@ -103,6 +103,23 @@ st.markdown("### 📚 Your Documents")
 try:
     documents = document_processor.get_user_documents(user_id)
     
+    # Self-healing: Check if any ready document is missing from the vector store
+    from rag.vector_store import VectorStore
+    from rag.pipeline import RAGPipeline
+    vs = VectorStore(user_id)
+    missing_docs = [d for d in documents if d.status == "ready" and d.id not in vs.metadata]
+    
+    if missing_docs:
+        with st.spinner(f"Syncing vector search database for {len(missing_docs)} documents..."):
+            rag_pipeline = RAGPipeline(user_id)
+            for doc in missing_docs:
+                try:
+                    rag_pipeline.index_document(doc.id, doc.chunks)
+                except Exception as e:
+                    logger.error(f"Failed to auto-reindex document {doc.id} during Documents page load: {e}")
+            # Reload documents list after indexing
+            documents = document_processor.get_user_documents(user_id)
+            
     if documents:
         # Filter and search
         col1, col2 = st.columns([2, 1])

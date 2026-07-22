@@ -245,6 +245,7 @@ class DocumentProcessor:
             
             if result.deleted_count > 0:
                 logger.info(f"Document deleted: {doc_id}")
+                
                 # Sync deletion: remove document relationships from Neo4j
                 try:
                     from knowledge_graph.manager import KnowledgeGraphManager
@@ -252,6 +253,15 @@ class DocumentProcessor:
                     kg_mgr.kg.delete_document_relations(doc_id)
                 except Exception as e:
                     logger.error(f"Error deleting Neo4j document relations: {e}")
+                    
+                # Sync deletion: remove document from FAISS Vector Store
+                try:
+                    from rag.vector_store import VectorStore
+                    vs = VectorStore(user_id)
+                    vs.delete_document(doc_id)
+                except Exception as e:
+                    logger.error(f"Error deleting vector store document: {e}")
+                    
                 return True
             
             return False
