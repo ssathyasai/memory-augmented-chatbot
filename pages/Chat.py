@@ -37,12 +37,13 @@ user_id = get_user_id()
 # Initialize memory manager in session state
 if "memory_manager" not in st.session_state:
     st.session_state.memory_manager = MemoryManager(user_id)
-    # Create or load session
-    if not st.session_state.get("current_session_id"):
-        session_id = st.session_state.memory_manager.create_session()
-        st.session_state.current_session_id = session_id
-    else:
-        st.session_state.memory_manager.set_session(st.session_state.current_session_id)
+
+# Create or load session
+if not st.session_state.get("current_session_id"):
+    session_id = st.session_state.memory_manager.create_session()
+    st.session_state.current_session_id = session_id
+else:
+    st.session_state.memory_manager.set_session(st.session_state.current_session_id)
 
 # Initialize RAG pipeline in session state
 if "rag_pipeline" not in st.session_state:
