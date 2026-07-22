@@ -279,7 +279,7 @@ Answer the user's question using this up-to-date information."""
     
     def _route_query(self, state: Dict) -> str:
         """Determine which path to take based on query analysis."""
-        last_message = state['messages'][-1]['content'].lower() if state.get('messages') else ""
+        last_message = state['messages'][-1]['content'] if state.get('messages') else ""
         use_rag = state.get("use_rag", True)
         
         # Check if user has vectors indexed in vector store
@@ -291,10 +291,51 @@ Answer the user's question using this up-to-date information."""
                 has_documents = True
         except Exception as e:
             logger.error(f"Error checking vector store in router: {e}")
+            
+        # Use LLM to classify the query semantically
+        system_prompt = """You are an intent router for a hybrid conversational assistant.
+Categorize the user's query into exactly one of these categories:
+- 'rag': If the query is explicitly asking about, referencing, or analyzing uploaded documents, files, or custom context.
+- 'kg': If the query is asking about connections, relationships, family trees, or links between entities (people, organizations, concepts).
+- 'web': If the query is asking about real-time information, current events, recent news, or requires live web search.
+- 'direct': If the query is a general question, greeting, riddle, logic puzzle, mathematical problem, coding request, or general knowledge that can be answered directly.
+
+Respond ONLY with the category name (one of: 'rag', 'kg', 'web', 'direct'). Do not include any other text, explanation, or markdown formatting."""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Query: {last_message}"}
+        ]
+        
+        try:
+            from rag.llm_client import groq_client
+            # Call LLM with low temperature and max_tokens
+            response = groq_client.client.chat.completions.create(
+                model=groq_client.model,
+                messages=messages,
+                temperature=0.0,
+                max_tokens=10
+            )
+            route = response.choices[0].message.content.strip().lower()
+            # Clean up route response (remove quotes, punctuation, etc.)
+            route = ''.join(c for c in route if c.isalnum())
+            
+            logger.info(f"LLM routed query to: '{route}' (raw response: '{response.choices[0].message.content}')")
+            
+            if route in ["rag", "kg", "web", "direct"]:
+                if route == "rag" and (not use_rag or not has_documents):
+                    # Fallback if RAG is requested but not available
+                    return "direct"
+                return route
+        except Exception as e:
+            logger.error(f"LLM routing failed, falling back to keyword router: {e}")
+            
+        # Fallback keyword router
+        last_message_lower = last_message.lower()
         
         # 1. Explicit Web-related search intent
         web_keywords = ["search web", "google search", "online news", "real-time stock", "browse web"]
-        if any(word in last_message for word in web_keywords):
+        if any(word in last_message_lower for word in web_keywords):
             return "web"
         
         # 2. Explicit Knowledge Graph or Relationship intent
@@ -303,7 +344,7 @@ Answer the user's question using this up-to-date information."""
             "node relationship", "related to", "relationship between", "connection between",
             "how are they related", "family tree", "connected to", "relationship of"
         ]
-        if any(word in last_message for word in kg_keywords) or ("related" in last_message and "how" in last_message):
+        if any(word in last_message_lower for word in kg_keywords) or ("related" in last_message_lower and "how" in last_message_lower):
             return "kg"
         
         # 3. If user has indexed documents and use_rag is enabled, route to RAG
