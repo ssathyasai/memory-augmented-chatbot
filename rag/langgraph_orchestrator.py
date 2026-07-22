@@ -228,12 +228,14 @@ Answer the user's question using this up-to-date information."""
             LongTermMemoryManager.extract_and_save_preferences(self.user_id, question)
             
             # Extract and save conversation entities/relationships to Neo4j Knowledge Graph
-            try:
-                from knowledge_graph.manager import KnowledgeGraphManager
-                kg_mgr = KnowledgeGraphManager(self.user_id)
-                kg_mgr.process_conversation(question, answer, session_id=session_id)
-            except Exception as e:
-                logger.error(f"Error updating Knowledge Graph from conversation: {e}")
+            # Only save for 'rag' or 'kg' queries to avoid polluting the graph with direct/web query content
+            if query_type in ["rag", "kg"]:
+                try:
+                    from knowledge_graph.manager import KnowledgeGraphManager
+                    kg_mgr = KnowledgeGraphManager(self.user_id)
+                    kg_mgr.process_conversation(question, answer, session_id=session_id)
+                except Exception as e:
+                    logger.error(f"Error updating Knowledge Graph from conversation: {e}")
             
             return state
         
