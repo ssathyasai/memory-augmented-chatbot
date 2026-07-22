@@ -145,25 +145,25 @@ def main():
             st.markdown("### 💬 Chat")
             st.write("Have conversations with AI that remembers context")
             if st.button("Go to Chat", key="nav_chat"):
-                st.switch_page("pages/2_💬_Chat.py")
+                st.switch_page("pages/2_Chat.py")
         
         with col2:
             st.markdown("### 📄 Documents")
             st.write("Upload and manage your documents")
             if st.button("Go to Documents", key="nav_docs"):
-                st.switch_page("pages/3_📄_Documents.py")
+                st.switch_page("pages/3_Documents.py")
         
         with col3:
             st.markdown("### 🧠 Knowledge Graph")
             st.write("Explore extracted knowledge")
             if st.button("Go to Knowledge Graph", key="nav_kg"):
-                st.switch_page("pages/4_🧠_Knowledge_Graph.py")
+                st.switch_page("pages/4_Knowledge_Graph.py")
                 
         with col4:
             st.markdown("### 📊 Evaluation")
             st.write("View quality and accuracy metrics")
             if st.button("Go to Evaluation", key="nav_eval"):
-                st.switch_page("pages/6_📊_Evaluation.py")
+                st.switch_page("pages/6_Evaluation.py")
         
         # Stats
         st.markdown("---")
