@@ -135,9 +135,12 @@ Answer the user's question using this structured knowledge."""
             
             # Fallback to direct LLM if no entities or relationships found in the subgraph
             messages = state['messages']
+            user_prefs = state.get('user_preferences', '')
+            system_content = """You are a helpful, knowledgeable AI assistant. Answer the user's questions clearly and accurately based on the full conversation history provided."""
             if user_prefs:
-                messages = [{"role": "system", "content": user_prefs}] + messages
-            state['answer'] = groq_client.chat_completion(messages)
+                system_content = f"{user_prefs}\n\n{system_content}"
+            full_messages = [{"role": "system", "content": system_content}] + messages
+            state['answer'] = groq_client.chat_completion(full_messages)
             state['query_type'] = 'direct'
             state['context'] = ''
             
@@ -196,9 +199,21 @@ Answer the user's question using this up-to-date information."""
             """Direct LLM query without RAG or KG."""
             messages = state['messages']
             user_prefs = state.get('user_preferences', '')
+            
+            # Build a proper system message that anchors the LLM to the user profile
+            system_content = """You are a helpful, knowledgeable AI assistant. Answer the user's questions clearly and accurately.
+
+Conversation Rules:
+- Always maintain full awareness of the entire conversation history provided.
+- If the user asks something that references earlier parts of the conversation (e.g., 'write a letter for me'), use all context from the conversation to fill in details (e.g., their name, college, department).
+- Never contradict what the user explicitly stated in the current conversation.
+- If the user says something changed (e.g., 'my college changed from X to Y'), always use the updated value Y."""
+            
             if user_prefs:
-                messages = [{"role": "system", "content": user_prefs}] + messages
-            state['answer'] = groq_client.chat_completion(messages)
+                system_content = f"{user_prefs}\n\n{system_content}"
+            
+            full_messages = [{"role": "system", "content": system_content}] + messages
+            state['answer'] = groq_client.chat_completion(full_messages)
             state['query_type'] = 'direct'
             state['context'] = ''
             return state
@@ -227,17 +242,19 @@ Answer the user's question using this up-to-date information."""
             
             # Extract and save user preferences from user query
             from memory.long_term import LongTermMemoryManager
-            LongTermMemoryManager.extract_and_save_preferences(self.user_id, question)
+            found_personal_facts = LongTermMemoryManager.extract_and_save_preferences(self.user_id, question)
             
-            # Extract and save conversation entities/relationships to Neo4j Knowledge Graph
-            # Only save for 'rag' or 'kg' queries to avoid polluting the graph with direct/web query content
-            if query_type in ["rag", "kg"]:
-                try:
-                    from knowledge_graph.manager import KnowledgeGraphManager
-                    kg_mgr = KnowledgeGraphManager(self.user_id)
-                    kg_mgr.process_conversation(question, answer, session_id=session_id)
-                except Exception as e:
-                    logger.error(f"Error updating Knowledge Graph from conversation: {e}")
+            # Extract and save conversation entities/relationships to Neo4j Knowledge Graph.
+            # Always run KG extraction — the LLM-based extractor will naturally filter out
+            # non-personal content (jokes, riddles, etc. produce no meaningful personal entities).
+            # This ensures personal info like college changes, name, etc. always update the KG
+            # regardless of whether the query was routed to 'direct', 'rag', 'kg', or 'web'.
+            try:
+                from knowledge_graph.manager import KnowledgeGraphManager
+                kg_mgr = KnowledgeGraphManager(self.user_id)
+                kg_mgr.process_conversation(question, answer, session_id=session_id)
+            except Exception as e:
+                logger.error(f"Error updating Knowledge Graph from conversation: {e}")
             
             return state
         
@@ -298,14 +315,7 @@ Answer the user's question using this up-to-date information."""
                 # Check for highly relevant local document match first (Retrieval-Guided Routing)
                 if use_rag:
                     q_emb = embedding_generator.generate_embedding(last_message)
-                    # Get user similarity threshold
-                    from config.database import get_database
-                    from bson import ObjectId
-                    db = get_database()
-                    user_doc = db.users.find_one({"_id": ObjectId(self.user_id)}) if db is not None else None
-                    user_settings = user_doc.get("settings", {}) if user_doc else {}
-                    similarity_threshold = user_settings.get("similarity_threshold", settings.SIMILARITY_THRESHOLD)
-                    
+                    similarity_threshold = settings.SIMILARITY_THRESHOLD
                     results = vs.search(q_emb, top_k=1)
                     if results and results[0][2] >= similarity_threshold:
                         logger.info(f"Retrieval-guided router: Found matching local document chunk (similarity={results[0][2]:.4f} >= threshold={similarity_threshold}). Routing directly to 'rag'.")

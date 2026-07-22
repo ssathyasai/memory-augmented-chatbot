@@ -132,15 +132,15 @@ class MemoryManager:
         
         return "\n".join(context_parts)
     
-    def get_messages_for_llm(self, max_messages: int = 6) -> List[Dict[str, str]]:
+    def get_messages_for_llm(self, max_messages: int = 10) -> List[Dict[str, str]]:
         """
         Get messages formatted for LLM API.
         
         Args:
-            max_messages: Maximum number of recent messages
+            max_messages: Maximum number of recent messages (default 10 for sufficient context)
         
         Returns:
-            List of message dictionaries
+            List of message dictionaries in oldest-to-newest order (correct for LLM)
         """
         messages = self.get_conversation_history(limit=max_messages)
         

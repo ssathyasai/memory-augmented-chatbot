@@ -22,7 +22,10 @@ class LongTermMemoryManager:
     """Manages extraction and retrieval of long-term user preferences."""
     
     @staticmethod
-    def extract_and_save_preferences(user_id: str, message: str) -> None:
+    def extract_and_save_preferences(user_id: str, message: str) -> bool:
+        """
+        Returns True if at least one preference was extracted and saved, False otherwise.
+        """
         """
         Analyze user message for persistent preferences and save them to MongoDB.
         
@@ -112,9 +115,10 @@ If no persistent facts or preferences are found, return an empty JSON array: []"
             preferences = find_key_value_dicts(extracted)
             
             if not preferences:
-                return
+                return False
                 
             db = get_database()
+            saved_any = False
             if db is not None:
                 for pref in preferences:
                     key = pref.get("key", "").strip().lower()
@@ -136,9 +140,12 @@ If no persistent facts or preferences are found, return an empty JSON array: []"
                             },
                             upsert=True
                         )
+                        saved_any = True
+            return saved_any
                         
         except Exception as e:
             logger.error(f"Error extracting user preferences: {e}")
+        return False
             
     @staticmethod
     def get_user_preferences_context(user_id: str) -> str:
@@ -214,7 +221,8 @@ If no persistent facts or preferences are found, return an empty JSON array: []"
                 return ""
                 
             context_parts = ["\n[USER PROFILE & LONG-TERM MEMORY]"]
-            context_parts.append("Keep the following user preferences and profile facts in mind to personalize your response:")
+            context_parts.append("Keep the following user preferences and profile facts in mind to personalize your response.")
+            context_parts.append("IMPORTANT: If any fact below appears to conflict with what the user says in the current conversation, ALWAYS prioritize and trust the most recent statement from the current conversation.")
             
             for memory in memories:
                 key = memory.get("key", "").replace("_", " ").title()
