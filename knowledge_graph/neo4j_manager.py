@@ -311,8 +311,59 @@ class Neo4jKnowledgeGraph:
             return True
         except Exception as e:
             logger.error(f"Error deleting document relationships: {e}")
-            return False
+    def get_subgraph_around_entities(self, names: List[str]) -> Dict[str, Any]:
+        """
+        Retrieve nodes and relationships within 2 hops of the given entity names.
+        
+        Args:
+            names: List of starting entity names
             
+        Returns:
+            Dictionary with 'entities' (list of node dicts) and 'relationships' (list of rel dicts)
+        """
+        if not self.driver or not names:
+            return {"entities": [], "relationships": []}
+            
+        try:
+            names_lower = [n.lower() for n in names]
+            
+            # 1. Fetch relationships within 2 hops
+            query_rels = """
+            MATCH (e:Entity {user_id: $user_id})
+            WHERE toLower(e.name) IN $names_lower
+            MATCH path = (e)-[r:RELATED*1..2]-(neighbor:Entity {user_id: $user_id})
+            UNWIND relationships(path) AS rel
+            RETURN DISTINCT startNode(rel).name AS source, endNode(rel).name AS target, rel.type AS type, properties(rel) AS properties
+            """
+            
+            with self.driver.session(database=self.database) as session:
+                result_rels = session.run(query_rels, user_id=self.user_id, names_lower=names_lower)
+                relationships = [dict(record) for record in result_rels]
+                
+                # Collect all involved entity names
+                all_entity_names = set(names)
+                for rel in relationships:
+                    all_entity_names.add(rel["source"])
+                    all_entity_names.add(rel["target"])
+                
+                # 2. Fetch all involved entities
+                query_entities = """
+                MATCH (e:Entity {user_id: $user_id})
+                WHERE toLower(e.name) IN $all_names_lower
+                RETURN e.name AS name, e.type AS type, properties(e) AS properties
+                """
+                all_names_lower = [n.lower() for n in all_entity_names]
+                result_entities = session.run(query_entities, user_id=self.user_id, all_names_lower=all_names_lower)
+                entities = [dict(record) for record in result_entities]
+                
+            return {
+                "entities": entities,
+                "relationships": relationships
+            }
+        except Exception as e:
+            logger.error(f"Error getting subgraph around entities: {e}")
+            return {"entities": [], "relationships": []}
+
     def clear_graph(self) -> bool:
         """
         Clear all entities and relationships associated with the user.
