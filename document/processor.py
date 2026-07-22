@@ -285,6 +285,15 @@ class DocumentProcessor:
         try:
             result = self.db.documents.delete_many({"user_id": user_id})
             logger.info(f"Deleted {result.deleted_count} documents for user {user_id}")
+            
+            # Sync deletion: clear FAISS vector store for this user
+            try:
+                from rag.vector_store import VectorStore
+                vs = VectorStore(user_id)
+                vs.clear()
+            except Exception as e:
+                logger.error(f"Error clearing vector store in delete_all_user_documents: {e}")
+                
             return True
         
         except Exception as e:
