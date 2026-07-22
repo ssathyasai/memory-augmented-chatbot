@@ -102,17 +102,17 @@ class HybridOrchestrator:
             entities = self._extract_entities_from_question(question)
             
             if entities:
-                # Query knowledge graph for relationships
-                kg_entities = []
-                for entity in entities:
-                    matched = self.kg_manager.get_entities(limit=20)
-                    kg_entities.extend(matched)
+                # Query knowledge graph for subgraph around entities
+                subgraph = self.kg_manager.get_subgraph_around_entities(entities)
+                kg_entities = subgraph.get("entities", [])
+                kg_relationships = subgraph.get("relationships", [])
                 
-                # Build KG context
-                kg_context = self._build_kg_context(kg_entities, entities)
-                
-                # Generate answer using KG context
-                system_prompt = f"""You are a helpful assistant that answers questions using the provided knowledge graph context.
+                if kg_relationships:
+                    # Build KG context
+                    kg_context = self._build_kg_context_from_subgraph(kg_entities, kg_relationships)
+                    
+                    # Generate answer using KG context
+                    system_prompt = f"""You are a helpful assistant that answers questions using the provided knowledge graph context.
 
 {user_prefs}
 
@@ -121,24 +121,25 @@ Knowledge Graph Context:
 
 Answer the user's question using this structured knowledge."""
 
-                answer = groq_client.generate_response(
-                    system_prompt=system_prompt,
-                    user_query=question,
-                    context=""
-                )
-                
-                state['answer'] = answer
-                state['entities'] = kg_entities
-                state['query_type'] = 'kg'
-                state['context'] = kg_context
-            else:
-                # Fallback to direct LLM
-                messages = state['messages']
-                if user_prefs:
-                    messages = [{"role": "system", "content": user_prefs}] + messages
-                state['answer'] = groq_client.chat_completion(messages)
-                state['query_type'] = 'direct'
-                state['context'] = ''
+                    answer = groq_client.generate_response(
+                        system_prompt=system_prompt,
+                        user_query=question,
+                        context=""
+                    )
+                    
+                    state['answer'] = answer
+                    state['entities'] = kg_entities
+                    state['query_type'] = 'kg'
+                    state['context'] = kg_context
+                    return state
+            
+            # Fallback to direct LLM if no entities or relationships found in the subgraph
+            messages = state['messages']
+            if user_prefs:
+                messages = [{"role": "system", "content": user_prefs}] + messages
+            state['answer'] = groq_client.chat_completion(messages)
+            state['query_type'] = 'direct'
+            state['context'] = ''
             
             return state
         
@@ -296,9 +297,13 @@ Answer the user's question using this up-to-date information."""
         if any(word in last_message for word in web_keywords):
             return "web"
         
-        # 2. Explicit Knowledge Graph intent
-        kg_keywords = ["knowledge graph", "graph relation", "entity connections", "how is connected", "node relationship"]
-        if any(word in last_message for word in kg_keywords):
+        # 2. Explicit Knowledge Graph or Relationship intent
+        kg_keywords = [
+            "knowledge graph", "graph relation", "entity connections", "how is connected", 
+            "node relationship", "related to", "relationship between", "connection between",
+            "how are they related", "family tree", "connected to", "relationship of"
+        ]
+        if any(word in last_message for word in kg_keywords) or ("related" in last_message and "how" in last_message):
             return "kg"
         
         # 3. If user has indexed documents and use_rag is enabled, route to RAG
@@ -318,7 +323,35 @@ Answer the user's question using this up-to-date information."""
         try:
             nlp = spacy.load("en_core_web_sm")
             doc = nlp(question)
-            return [ent.text for ent in doc.ents]
+            
+            entities = []
+            seen = set()
+            
+            # 1. Named Entities (proper nouns, etc.)
+            for ent in doc.ents:
+                text = ent.text.strip()
+                if text and len(text) > 1:
+                    text_lower = text.lower()
+                    if text_lower not in seen:
+                        entities.append(text)
+                        seen.add(text_lower)
+                        
+            # 2. Noun chunks (covers common nouns like boy, girl, uncle, father, etc.)
+            for chunk in doc.noun_chunks:
+                text = chunk.text.strip()
+                # Clean up leading determiners or pronouns
+                text_lower = text.lower()
+                for word in ['the ', 'a ', 'an ', 'my ', 'his ', 'her ', 'your ', 'their ']:
+                    if text_lower.startswith(word):
+                        text = text[len(word):]
+                        text_lower = text_lower[len(word):]
+                text = text.strip()
+                if text and len(text) > 1:
+                    if text_lower not in seen:
+                        entities.append(text)
+                        seen.add(text_lower)
+                        
+            return entities
         except Exception:
             return []
     
@@ -356,8 +389,32 @@ Answer the user's question using this up-to-date information."""
                 for rel in relationships[:3]:  # Top 3 relationships
                     context_parts.append(f"    - {rel.get('source', '')} -> {rel.get('type', 'related_to')} -> {rel.get('target', '')}")
             
-            context_parts.append("")
+        return "\n".join(context_parts)
+
+    def _build_kg_context_from_subgraph(self, entities: List[Dict], relationships: List[Dict]) -> str:
+        """Build context string from knowledge graph entities and relationships."""
+        if not entities and not relationships:
+            return "No knowledge graph context found."
+            
+        context_parts = []
         
+        if entities:
+            context_parts.append("Entities:")
+            for entity in entities:
+                name = entity.get('name', 'Unknown')
+                ent_type = entity.get('type', 'Unknown')
+                context_parts.append(f"  - Name: {name}, Type: {ent_type}")
+            context_parts.append("")
+            
+        if relationships:
+            context_parts.append("Relationships:")
+            for rel in relationships:
+                source = rel.get('source', '')
+                target = rel.get('target', '')
+                rel_type = rel.get('type', 'RELATED_TO')
+                context_parts.append(f"  - {source} -> {rel_type} -> {target}")
+            context_parts.append("")
+            
         return "\n".join(context_parts)
     
     def _format_web_results(self, results: List[Dict]) -> str:
