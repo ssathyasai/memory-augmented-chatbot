@@ -177,6 +177,18 @@ for msg in messages:
     with st.chat_message(msg.role):
         st.markdown(msg.content)
         
+        # Show retrieval source badge
+        if msg.role == "assistant":
+            q_type = msg.metadata.get("query_type", "direct") if msg.metadata else "direct"
+            source_labels = {
+                "rag": "📄 Document Retrieval",
+                "kg": "🕸️ Knowledge Graph",
+                "web": "🌐 Web Search",
+                "direct": "🤖 LLM Reasoning"
+            }
+            label = source_labels.get(q_type, "🤖 LLM Reasoning")
+            st.caption(f"*Source: {label}*")
+            
         # Show sources if available
         if show_sources and msg.sources:
             with st.expander(f"📄 Sources ({len(msg.sources)})"):
@@ -215,6 +227,16 @@ if prompt := st.chat_input("Ask me anything..."):
                 
                 # Display response
                 st.markdown(response)
+                
+                # Show retrieval source badge
+                source_labels = {
+                    "rag": "📄 Document Retrieval",
+                    "kg": "🕸️ Knowledge Graph",
+                    "web": "🌐 Web Search",
+                    "direct": "🤖 LLM Reasoning"
+                }
+                label = source_labels.get(query_type, "🤖 LLM Reasoning")
+                st.caption(f"*Source: {label}*")
                 
                 # Show metadata
                 with st.expander("🔍 Query Details"):
