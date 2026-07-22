@@ -136,7 +136,12 @@ Answer the user's question using this structured knowledge."""
             # Fallback to direct LLM if no entities or relationships found in the subgraph
             messages = state['messages']
             user_prefs = state.get('user_preferences', '')
-            system_content = """You are a helpful, knowledgeable AI assistant. Answer the user's questions clearly and accurately based on the full conversation history provided."""
+            system_content = """You are a helpful, knowledgeable AI assistant. Answer the user's questions clearly and accurately.
+
+CRITICAL RULES:
+1. The conversation history below contains EVERYTHING the user has already told you. Read it carefully before responding.
+2. NEVER ask the user to repeat or re-confirm information they have already provided. Use it directly.
+3. If generating a letter or document, extract ALL required details from the conversation history and produce the complete output immediately."""
             if user_prefs:
                 system_content = f"{user_prefs}\n\n{system_content}"
             full_messages = [{"role": "system", "content": system_content}] + messages
@@ -200,14 +205,16 @@ Answer the user's question using this up-to-date information."""
             messages = state['messages']
             user_prefs = state.get('user_preferences', '')
             
-            # Build a proper system message that anchors the LLM to the user profile
+            # Build a proper system message that anchors the LLM to the full conversation context
             system_content = """You are a helpful, knowledgeable AI assistant. Answer the user's questions clearly and accurately.
 
-Conversation Rules:
-- Always maintain full awareness of the entire conversation history provided.
-- If the user asks something that references earlier parts of the conversation (e.g., 'write a letter for me'), use all context from the conversation to fill in details (e.g., their name, college, department).
-- Never contradict what the user explicitly stated in the current conversation.
-- If the user says something changed (e.g., 'my college changed from X to Y'), always use the updated value Y."""
+CRITICAL RULES (follow these without exception):
+1. The conversation history below contains EVERYTHING the user has already told you. Read it carefully before responding.
+2. NEVER ask the user to repeat or re-confirm information they have already provided in this conversation. Use it directly.
+3. If the user says 'write a letter', 'generate a letter', or any similar document task, extract ALL relevant details (name, college, year, department, date, reason, etc.) directly from the conversation history and user profile, then produce the complete letter without asking for more information.
+4. If some detail is truly missing (e.g., department was never mentioned anywhere), you may request only that specific missing piece — but never ask for things that were already mentioned.
+5. If the user says something changed (e.g., 'my college changed from X to Y'), always use the updated value Y.
+6. Always address the user by their name if it was shared."""
             
             if user_prefs:
                 system_content = f"{user_prefs}\n\n{system_content}"

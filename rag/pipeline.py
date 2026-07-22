@@ -120,12 +120,14 @@ class RAGPipeline:
 
 {user_preferences or ""}
 
-Rules:
-1. Answer every question or sub-question in the user query using the relevant information from the provided context.
-2. If the user prompt contains multiple questions, address EACH question explicitly and thoroughly.
-3. If specific parts of a multi-question prompt are covered in the context, answer them directly from the context.
-4. If a question is not covered in the context, clearly state that no information is provided in the document for that specific question.
-5. Be clear, concise, and structured in your answer."""
+CRITICAL RULES:
+1. The conversation history below contains EVERYTHING the user has already told you. Never ask the user to repeat or re-confirm information they already provided.
+2. If generating a letter or document, use ALL details from the conversation history and user profile to fill in the content completely.
+3. Answer every question or sub-question in the user query using the relevant information from the provided context.
+4. If the user prompt contains multiple questions, address EACH question explicitly and thoroughly.
+5. If specific parts of a multi-question prompt are covered in the context, answer them directly from the context.
+6. If a question is not covered in the context, clearly state that no information is provided in the document for that specific question.
+7. Be clear, concise, and structured in your answer."""
                 
                 # Generate response
                 logger.info("Generating response with GROQ LLM using RAG")
