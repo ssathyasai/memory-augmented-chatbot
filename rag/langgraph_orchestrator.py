@@ -290,9 +290,26 @@ Answer the user's question using this up-to-date information."""
         has_documents = False
         try:
             from rag.vector_store import VectorStore
+            from rag.embeddings import embedding_generator
             vs = VectorStore(self.user_id)
             if vs.index and vs.index.ntotal > 0:
                 has_documents = True
+                
+                # Check for highly relevant local document match first (Retrieval-Guided Routing)
+                if use_rag:
+                    q_emb = embedding_generator.generate_embedding(last_message)
+                    # Get user similarity threshold
+                    from config.database import get_database
+                    from bson import ObjectId
+                    db = get_database()
+                    user_doc = db.users.find_one({"_id": ObjectId(self.user_id)}) if db is not None else None
+                    user_settings = user_doc.get("settings", {}) if user_doc else {}
+                    similarity_threshold = user_settings.get("similarity_threshold", settings.SIMILARITY_THRESHOLD)
+                    
+                    results = vs.search(q_emb, top_k=1)
+                    if results and results[0][2] >= similarity_threshold:
+                        logger.info(f"Retrieval-guided router: Found matching local document chunk (similarity={results[0][2]:.4f} >= threshold={similarity_threshold}). Routing directly to 'rag'.")
+                        return "rag"
         except Exception as e:
             logger.error(f"Error checking vector store in router: {e}")
             
