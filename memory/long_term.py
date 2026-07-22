@@ -31,22 +31,22 @@ class LongTermMemoryManager:
             message: User's chat message
         """
         system_prompt = """You are a user profile preference extraction agent. 
-Analyze the user's message and determine if it contains any persistent personal facts, preferences, constraints, or technical choices (e.g. "I prefer Python", "I am a frontend developer", "I only work with FastAPI", "I don't like Java").
+Analyze the user's message and determine if it contains any persistent personal facts, profile details, preferences, constraints, or technical choices (e.g. "My name is Sathyasai", "I study Computer Science", "My roll number is 12345", "I am in B.Tech 4th year", "I study at CVR College of Engineering", "I prefer Python", "I don't like Java").
 
-If it does, extract them as structured key-value statements. Focus only on long-term preferences, not transient questions.
+If it does, extract them as structured key-value statements. Focus only on long-term personal facts and preferences, not transient questions.
 
 You MUST respond with a valid JSON array of objects. Do not include any markdown styling like ```json or ```, and do not write any introductory or concluding text.
 
 JSON Schema:
 [
   {
-    "key": "unique_lowercase_preference_name",
-    "value": "extracted preference value",
-    "explanation": "Brief explanation of why this preference was extracted"
+    "key": "unique_lowercase_fact_or_preference_name",
+    "value": "extracted fact or preference value",
+    "explanation": "Brief explanation of why this fact/preference was extracted"
   }
 ]
 
-If no persistent preferences are found, return an empty JSON array: []"""
+If no persistent facts or preferences are found, return an empty JSON array: []"""
 
         try:
             messages = [
