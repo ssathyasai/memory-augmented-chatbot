@@ -212,6 +212,12 @@ class ConversationStorage:
                 "user_id": user_id
             })
             
+            # Also clean up individual chat messages/evaluations for this session
+            self.db.chats.delete_many({
+                "session_id": session_id,
+                "user_id": user_id
+            })
+            
             if result.deleted_count > 0:
                 logger.info(f"Deleted conversation: {session_id}")
                 return True
@@ -254,6 +260,8 @@ class ConversationStorage:
         
         try:
             result = self.db.conversations.delete_many({"user_id": user_id})
+            # Also clean up all individual chat messages/evaluations for this user
+            self.db.chats.delete_many({"user_id": user_id})
             logger.info(f"Deleted {result.deleted_count} conversations for user {user_id}")
             return True
         
