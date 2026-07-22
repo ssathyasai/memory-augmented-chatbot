@@ -158,6 +158,29 @@ with st.sidebar:
                 st.error(f"Failed to delete chat history: {e}")
         else:
             st.error("Database not available")
+            
+        # Show retrieval details in the sidebar (the "side")
+        if "last_query_details" in st.session_state and st.session_state.last_query_details:
+            st.markdown("---")
+            st.markdown("### 🔍 Last Response Info")
+            details = st.session_state.last_query_details
+            q_type = details.get("query_type", "direct")
+            source_labels = {
+                "rag": "📄 Document Retrieval",
+                "kg": "🕸️ Knowledge Graph",
+                "web": "🌐 Web Search",
+                "direct": "🤖 LLM Reasoning"
+            }
+            st.markdown(f"**Source:** {source_labels.get(q_type, '🤖 LLM Reasoning')}")
+            
+            # Display sources in sidebar if available
+            sources = details.get("sources", [])
+            if show_sources and sources:
+                with st.expander(f"📄 Sources ({len(sources)})"):
+                    for i, source in enumerate(sources, 1):
+                        st.markdown(f"**Source {i}** (Similarity: {source.get('similarity', 'N/A'):.2f})")
+                        st.caption(source.get('chunk', source.get('content', '')))
+                        st.markdown("---")
 
 # Main chat interface
 st.markdown("### 💭 Conversation")
@@ -169,6 +192,19 @@ if st.session_state.current_session_id:
 # Load and display conversation history
 messages = st.session_state.memory_manager.get_conversation_history()
 
+# Initialize last_query_details in session state
+if "last_query_details" not in st.session_state:
+    st.session_state.last_query_details = None
+
+# If not set, populate it from the last assistant message in history
+if st.session_state.last_query_details is None and messages:
+    last_assistant_msg = next((m for m in reversed(messages) if m.role == "assistant"), None)
+    if last_assistant_msg:
+        st.session_state.last_query_details = {
+            "query_type": last_assistant_msg.metadata.get("query_type", "direct") if last_assistant_msg.metadata else "direct",
+            "sources": [{"doc_id": s, "chunk": f"Document ID: {s}"} for s in last_assistant_msg.sources] if last_assistant_msg.sources else []
+        }
+
 if not messages:
     st.info("👋 Start a conversation! Ask me anything - I can also answer questions about your uploaded documents.")
 
@@ -176,24 +212,6 @@ if not messages:
 for msg in messages:
     with st.chat_message(msg.role):
         st.markdown(msg.content)
-        
-        # Show retrieval source badge
-        if msg.role == "assistant":
-            q_type = msg.metadata.get("query_type", "direct") if msg.metadata else "direct"
-            source_labels = {
-                "rag": "📄 Document Retrieval",
-                "kg": "🕸️ Knowledge Graph",
-                "web": "🌐 Web Search",
-                "direct": "🤖 LLM Reasoning"
-            }
-            label = source_labels.get(q_type, "🤖 LLM Reasoning")
-            st.caption(f"*Source: {label}*")
-            
-        # Show sources if available
-        if show_sources and msg.sources:
-            with st.expander(f"📄 Sources ({len(msg.sources)})"):
-                for i, source in enumerate(msg.sources, 1):
-                    st.caption(f"**Source {i}:** {source}")
 
 # Chat input
 if prompt := st.chat_input("Ask me anything..."):
@@ -228,15 +246,11 @@ if prompt := st.chat_input("Ask me anything..."):
                 # Display response
                 st.markdown(response)
                 
-                # Show retrieval source badge
-                source_labels = {
-                    "rag": "📄 Document Retrieval",
-                    "kg": "🕸️ Knowledge Graph",
-                    "web": "🌐 Web Search",
-                    "direct": "🤖 LLM Reasoning"
+                # Store query details in session state for sidebar retrieval
+                st.session_state.last_query_details = {
+                    "query_type": query_type,
+                    "sources": sources
                 }
-                label = source_labels.get(query_type, "🤖 LLM Reasoning")
-                st.caption(f"*Source: {label}*")
                 
                 # Show metadata
                 with st.expander("🔍 Query Details"):
@@ -277,14 +291,6 @@ if prompt := st.chat_input("Ask me anything..."):
                         st.caption(f"**Faithfulness reasoning:** {eval_data.get('faithfulness_explanation', '')}")
                         st.caption(f"**Relevance reasoning:** {eval_data.get('context_relevance_explanation', '')}")
                         st.caption(f"**Correctness reasoning:** {eval_data.get('answer_correctness_explanation', '')}")
-                
-                # Show sources
-                if show_sources and sources:
-                    with st.expander(f"📄 Sources ({len(sources)})"):
-                        for i, source in enumerate(sources, 1):
-                            st.markdown(f"**Source {i}** (Similarity: {source.get('similarity', 'N/A'):.2f})")
-                            st.caption(source.get('chunk', source.get('content', '')))
-                            st.markdown("---")
                 
                 # Save assistant message
                 st.session_state.memory_manager.add_assistant_message(
