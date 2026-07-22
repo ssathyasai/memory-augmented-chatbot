@@ -211,13 +211,15 @@ Answer the user's question using this up-to-date information."""
             query_type = state.get('query_type', 'direct')
             context = state.get('context', '')
             
-            # Run RAG evaluation
-            evaluation = RAGEvaluator.evaluate_query(
-                query=question,
-                context=context,
-                answer=answer,
-                query_type=query_type
-            )
+            # Run RAG evaluation only for queries with context
+            evaluation = None
+            if query_type in ["rag", "kg", "web"] and context and context.strip():
+                evaluation = RAGEvaluator.evaluate_query(
+                    query=question,
+                    context=context,
+                    answer=answer,
+                    query_type=query_type
+                )
             state['evaluation'] = evaluation
             
             session_id = state.get("session_id")
