@@ -77,51 +77,6 @@ with st.form("change_password_form"):
                 error_msg = get_user_message(e)
                 st.error(error_msg)
 
-# RAG Settings Section
-st.markdown("---")
-st.markdown("### 🔍 RAG Configuration")
-
-st.info("Adjust these settings to control how documents are retrieved and processed.")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    top_k = st.slider(
-        "Top K Results",
-        min_value=1,
-        max_value=20,
-        value=user.settings.get("top_k", 8),
-        help="Number of document chunks to retrieve"
-    )
-    
-    chunk_size = st.slider(
-        "Chunk Size",
-        min_value=500,
-        max_value=2000,
-        value=user.settings.get("chunk_size", 1000),
-        step=100,
-        help="Size of document chunks in characters"
-    )
-
-with col2:
-    similarity_threshold = st.slider(
-        "Similarity Threshold",
-        min_value=0.0,
-        max_value=1.0,
-        value=user.settings.get("similarity_threshold", 0.25),
-        step=0.05,
-        help="Minimum similarity score for retrieval"
-    )
-    
-    chunk_overlap = st.slider(
-        "Chunk Overlap",
-        min_value=0,
-        max_value=500,
-        value=user.settings.get("chunk_overlap", 200),
-        step=50,
-        help="Overlap between consecutive chunks"
-    )
-
 # User Preferences Section
 st.markdown("---")
 st.markdown("### 🎨 Preferences")
@@ -154,11 +109,7 @@ if st.button("💾 Save All Settings", type="primary", use_container_width=True)
         new_settings = {
             "theme": theme.lower(),
             "notifications": notifications,
-            "show_sources": show_sources,
-            "top_k": top_k,
-            "chunk_size": chunk_size,
-            "similarity_threshold": similarity_threshold,
-            "chunk_overlap": chunk_overlap
+            "show_sources": show_sources
         }
         # Retain language settings if already present in DB
         if "language" in user.settings:
