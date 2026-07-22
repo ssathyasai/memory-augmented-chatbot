@@ -242,6 +242,18 @@ JSON Schema:
             List of entities
         """
         return self.kg.get_entities(entity_type, limit)
+
+    def get_subgraph_around_entities(self, names: List[str]) -> Dict[str, Any]:
+        """
+        Get subgraph (nodes and relationships) within 2 hops of the given entity names.
+        
+        Args:
+            names: List of starting entity names
+            
+        Returns:
+            Dictionary with 'entities' and 'relationships'
+        """
+        return self.kg.get_subgraph_around_entities(names)
     
     def get_relationships(self, entity_name: str = None) -> List[Dict[str, Any]]:
         """
