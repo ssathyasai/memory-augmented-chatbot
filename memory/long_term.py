@@ -33,36 +33,45 @@ class LongTermMemoryManager:
             user_id: User ID
             message: User's chat message
         """
-        system_prompt = """You are a user profile preference extraction agent. 
-Analyze the user's message and determine if it contains any persistent personal facts, profile details, preferences, constraints, or technical choices.
+        system_prompt = """You are a strict user profile extraction agent.
+Your ONLY job is to extract PERMANENT personal facts about the user themselves — things that stay true across conversations.
 
-If it does, extract them as structured key-value statements. Focus only on long-term personal facts and preferences, not transient questions.
+Extract ONLY if explicitly stated by the user. Standard keys to use:
+- 'name': The user's personal name (e.g., "Sathyasai", "Ravi")
+- 'roll_number': Roll number or student ID (e.g., "21BD1A05C7")
+- 'department': Branch/field of study (e.g., "Computer Science", "ECE", "CSD")
+- 'institution': College/university name (e.g., "CVR College of Engineering", "MVSR")
+- 'education_level': Degree AND year ONLY (e.g., "B.Tech 4th year", "M.Tech 2nd year") — NOT words like "absent", "present", "student"
+- 'programming_languages': Languages they explicitly say they prefer/use (e.g., "Python", "Java")
+- 'technical_interests': Technical topics they explicitly say they like (e.g., "Machine Learning", "Web Development")
 
-You MUST map each extracted fact or preference to one of these standard keys if applicable:
-- 'name': The user's name
-- 'roll_number': The user's roll number/student ID
-- 'department': The user's department, branch, or field of study
-- 'institution': The user's college, university, or educational institution
-- 'education_level': The user's current degree, year, or grade of study (e.g., "B.Tech 4th year")
-- 'programming_languages': Preferred programming languages or technical stacks
-- 'technical_interests': Technical focus areas or interest fields
-If a preference does not fit any of the above standard keys, you may use a custom, descriptive, lowercase key name.
+STRICT RULES — NEVER extract:
+- Transient states or actions: "absent", "present", "late", "sick", "available"
+- Time words: "yesterday", "today", "tomorrow"
+- Anything the user is asking about (questions, requests)
+- Generic words that aren't specific user facts
+- Anything from the bot/assistant messages
 
-Crucially:
-- If the user explicitly mentions a change of state (e.g., "changed my college from X to Y", "my new department is Z", "changed my name to A"), make sure to output the correct standard key with the new value so that it overwrites the previous entry in the database.
+GOOD extraction example:
+  User: "My name is Sathyasai, I study B.Tech 4th year at CVR College of Engineering"
+  -> Extract: name=Sathyasai, education_level=B.Tech 4th year, institution=CVR College of Engineering
 
-You MUST respond with a valid JSON array of objects. Do not include any markdown styling like ```json or ```, and do not write any introductory or concluding text.
+BAD extraction example (DO NOT DO THIS):
+  User: "Yesterday I was absent from college"
+  -> DO NOT extract: education_level=absent, institution=college
+  -> This has NO permanent profile facts. Return []
 
+You MUST respond with ONLY a valid JSON array. No markdown, no explanation text.
 JSON Schema:
 [
   {
-    "key": "standard_or_custom_lowercase_key",
-    "value": "extracted fact or preference value",
-    "explanation": "Brief explanation of why this fact/preference was extracted"
+    "key": "standard_key_name",
+    "value": "the actual extracted value",
+    "explanation": "brief reason"
   }
 ]
 
-If no persistent facts or preferences are found, return an empty JSON array: []"""
+If no PERMANENT profile facts exist in the message, return exactly: []"""
 
         try:
             messages = [
