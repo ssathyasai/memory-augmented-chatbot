@@ -23,6 +23,7 @@ class Neo4jManager:
     def __init__(self):
         """Initialize Neo4j manager."""
         self._driver: Optional[Driver] = None
+        self._connection_attempted: bool = False
         
     def _get_db_name(self) -> str:
         """Get database name, falling back to user on Aura if database is defaulting to 'neo4j'."""
@@ -31,13 +32,25 @@ class Neo4jManager:
             return settings.NEO4J_USER
         return database
     
-    def connect(self) -> bool:
+    def connect(self, force: bool = False) -> bool:
         """
         Connect to Neo4j.
         
+        Args:
+            force: Re-attempt connection even if previously attempted.
+
         Returns:
             bool: True if connection successful, False otherwise
         """
+        if self._connection_attempted and not force and self._driver is None:
+            return False
+
+        self._connection_attempted = True
+
+        if not settings.NEO4J_PASSWORD or not settings.NEO4J_URI:
+            logger.info("Neo4j credentials not configured. Skipping connection.")
+            return False
+
         try:
             self._driver = GraphDatabase.driver(
                 settings.NEO4J_URI,
@@ -52,10 +65,20 @@ class Neo4jManager:
             
         except (ServiceUnavailable, AuthError) as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
+            if self._driver:
+                try:
+                    self._driver.close()
+                except Exception:
+                    pass
             self._driver = None
             return False
         except Exception as e:
             logger.error(f"Unexpected error connecting to Neo4j: {e}")
+            if self._driver:
+                try:
+                    self._driver.close()
+                except Exception:
+                    pass
             self._driver = None
             return False
     

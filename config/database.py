@@ -25,14 +25,23 @@ class MongoDBManager:
         """Initialize MongoDB manager."""
         self._client: Optional[MongoClient] = None
         self._db: Optional[Database] = None
+        self._connection_attempted: bool = False
     
-    def connect(self) -> bool:
+    def connect(self, force: bool = False) -> bool:
         """
         Connect to MongoDB.
         
+        Args:
+            force: Re-attempt connection even if previously attempted.
+
         Returns:
             bool: True if connection successful, False otherwise
         """
+        if self._connection_attempted and not force and self._db is None:
+            return False
+
+        self._connection_attempted = True
+
         try:
             self._client = MongoClient(
                 settings.MONGODB_URI,

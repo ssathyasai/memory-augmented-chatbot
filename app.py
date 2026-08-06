@@ -72,7 +72,7 @@ st.markdown("""
 def initialize_connections():
     """Initialize database connections."""
     # Initialize MongoDB
-    if not mongodb_manager.is_connected():
+    if not mongodb_manager.is_connected() and not getattr(mongodb_manager, "_connection_attempted", False):
         logger.info("Connecting to MongoDB...")
         if mongodb_manager.connect():
             mongodb_manager.create_indexes()
@@ -81,7 +81,7 @@ def initialize_connections():
             logger.warning("MongoDB connection failed - some features may not work")
     
     # Initialize Neo4j
-    if not neo4j_manager.is_connected():
+    if not neo4j_manager.is_connected() and not getattr(neo4j_manager, "_connection_attempted", False):
         logger.info("Connecting to Neo4j...")
         try:
             if neo4j_manager.connect():
