@@ -54,11 +54,11 @@ class Settings(BaseSettings):
     
     # Neo4j
     NEO4J_URI: str = Field(
-        default_factory=lambda: _get_secret_or_env("NEO4J_URI", "bolt://localhost:7687"),
+        default_factory=lambda: _get_secret_or_env("NEO4J_URI", "neo4j+s://fc54b344.databases.neo4j.io"),
         description="Neo4j connection URI"
     )
     NEO4J_USER: str = Field(
-        default_factory=lambda: _get_secret_or_env("NEO4J_USER", "neo4j"),
+        default_factory=lambda: _get_secret_or_env("NEO4J_USER", "fc54b344"),
         description="Neo4j username (for Aura, use instance ID)"
     )
     NEO4J_PASSWORD: str = Field(
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
         description="Neo4j password"
     )
     NEO4J_DATABASE: str = Field(
-        default_factory=lambda: _get_secret_or_env("NEO4J_DATABASE", "neo4j"),
+        default_factory=lambda: _get_secret_or_env("NEO4J_DATABASE", "fc54b344"),
         description="Neo4j database name (for Aura, use instance ID)"
     )
     
