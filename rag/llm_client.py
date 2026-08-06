@@ -9,6 +9,7 @@ Process Flow:
 
 import logging
 from typing import List, Dict
+import httpx
 from groq import Groq
 
 from config.settings import settings
@@ -20,16 +21,27 @@ logger = logging.getLogger(__name__)
 class GroqClient:
     """Client for GROQ LLM API."""
     
+    def _create_client(self, api_key: str) -> Groq:
+        """Create Groq client using httpx.Client to prevent httpx proxies kwargs incompatibility."""
+        try:
+            return Groq(api_key=api_key, http_client=httpx.Client())
+        except Exception:
+            return Groq(api_key=api_key)
+
     def __init__(self):
         """Initialize GROQ client."""
         try:
-            self.client = Groq(api_key=settings.GROQ_API_KEY)
+            api_key = settings.GROQ_API_KEY or "placeholder_key"
+            self.client = self._create_client(api_key)
             self.model = settings.GROQ_MODEL
             self.temperature = settings.GROQ_TEMPERATURE
             self.max_tokens = settings.GROQ_MAX_TOKENS
         except Exception as e:
-            logger.error(f"Error initializing GROQ client: {e}")
-            raise LLMError(f"Failed to initialize GROQ client: {str(e)}")
+            logger.warning(f"Warning during GROQ client initialization: {e}")
+            self.client = None
+            self.model = settings.GROQ_MODEL
+            self.temperature = settings.GROQ_TEMPERATURE
+            self.max_tokens = settings.GROQ_MAX_TOKENS
     
     def chat_completion(
         self,
@@ -54,7 +66,13 @@ class GroqClient:
         temperature = temperature if temperature is not None else self.temperature
         max_tokens = max_tokens or self.max_tokens
         
+        if not settings.GROQ_API_KEY:
+            raise LLMError("GROQ API Key is missing. Please set GROQ_API_KEY in your environment variables or Streamlit secrets.")
+
         try:
+            if self.client is None or getattr(self.client, "api_key", None) == "placeholder_key":
+                self.client = self._create_client(settings.GROQ_API_KEY)
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,

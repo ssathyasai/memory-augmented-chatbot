@@ -7,9 +7,23 @@ Process Flow:
 4. Exports a singleton `settings` object used across the application architecture.
 """
 
+import os
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import List
+from typing import List, Any
+
+
+def _get_secret_or_env(key: str, default: str = "") -> str:
+    """Helper to fetch configuration value from os.environ or streamlit.secrets."""
+    if key in os.environ and os.environ[key]:
+        return os.environ[key]
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and key in st.secrets and st.secrets[key]:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return default
 
 
 class Settings(BaseSettings):
@@ -20,24 +34,51 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # Security
-    JWT_SECRET_KEY: str = Field(..., description="Secret key for JWT token generation")
+    JWT_SECRET_KEY: str = Field(
+        default_factory=lambda: _get_secret_or_env("JWT_SECRET_KEY", "dev-secret-key-change-in-production"),
+        description="Secret key for JWT token generation"
+    )
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_HOURS: int = 24
     PASSWORD_MIN_LENGTH: int = 8
     
     # MongoDB
-    MONGODB_URI: str = Field(..., description="MongoDB connection string")
-    MONGODB_DB_NAME: str = "chatbot_db"
+    MONGODB_URI: str = Field(
+        default_factory=lambda: _get_secret_or_env("MONGODB_URI", "mongodb://localhost:27017"),
+        description="MongoDB connection string"
+    )
+    MONGODB_DB_NAME: str = Field(
+        default_factory=lambda: _get_secret_or_env("MONGODB_DB_NAME", "chatbot_db"),
+        description="MongoDB database name"
+    )
     
     # Neo4j
-    NEO4J_URI: str = Field(..., description="Neo4j connection URI")
-    NEO4J_USER: str = Field(..., description="Neo4j username (for Aura, use instance ID)")
-    NEO4J_PASSWORD: str = Field(..., description="Neo4j password")
-    NEO4J_DATABASE: str = Field(default="neo4j", description="Neo4j database name (for Aura, use instance ID)")
+    NEO4J_URI: str = Field(
+        default_factory=lambda: _get_secret_or_env("NEO4J_URI", "bolt://localhost:7687"),
+        description="Neo4j connection URI"
+    )
+    NEO4J_USER: str = Field(
+        default_factory=lambda: _get_secret_or_env("NEO4J_USER", "neo4j"),
+        description="Neo4j username (for Aura, use instance ID)"
+    )
+    NEO4J_PASSWORD: str = Field(
+        default_factory=lambda: _get_secret_or_env("NEO4J_PASSWORD", ""),
+        description="Neo4j password"
+    )
+    NEO4J_DATABASE: str = Field(
+        default_factory=lambda: _get_secret_or_env("NEO4J_DATABASE", "neo4j"),
+        description="Neo4j database name (for Aura, use instance ID)"
+    )
     
     # GROQ
-    GROQ_API_KEY: str = Field(..., description="GROQ API key")
-    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_API_KEY: str = Field(
+        default_factory=lambda: _get_secret_or_env("GROQ_API_KEY", ""),
+        description="GROQ API key"
+    )
+    GROQ_MODEL: str = Field(
+        default_factory=lambda: _get_secret_or_env("GROQ_MODEL", "llama-3.1-8b-instant"),
+        description="GROQ model name"
+    )
     GROQ_MAX_TOKENS: int = 1024
     GROQ_TEMPERATURE: float = 0.7
     
@@ -70,6 +111,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"
 
 
 # Global settings instance
