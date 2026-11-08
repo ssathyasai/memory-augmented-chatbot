@@ -59,19 +59,21 @@ GOOD extraction example:
 BAD extraction example (DO NOT DO THIS):
   User: "Yesterday I was absent from college"
   -> DO NOT extract: education_level=absent, institution=college
-  -> This has NO permanent profile facts. Return []
+  -> This has NO permanent profile facts. Return {"facts": []}
 
-You MUST respond with ONLY a valid JSON array. No markdown, no explanation text.
+You MUST respond with ONLY a valid JSON object. No markdown, no explanation text.
 JSON Schema:
-[
-  {
-    "key": "standard_key_name",
-    "value": "the actual extracted value",
-    "explanation": "brief reason"
-  }
-]
+{
+  "facts": [
+    {
+      "key": "standard_key_name",
+      "value": "the actual extracted value",
+      "explanation": "brief reason"
+    }
+  ]
+}
 
-If no PERMANENT profile facts exist in the message, return exactly: []"""
+If no PERMANENT profile facts exist in the message, return exactly: {"facts": []}"""
 
         try:
             messages = [

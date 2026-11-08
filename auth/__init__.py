@@ -6,6 +6,6 @@ Process Flow:
 """
 
 from .models import User, UserCreate, UserLogin, UserResponse
-from .manager import AuthManager
+from .manager import AuthManager, auth_manager
 
-__all__ = ["AuthManager", "User", "UserCreate", "UserLogin", "UserResponse"]
+__all__ = ["AuthManager", "auth_manager", "User", "UserCreate", "UserLogin", "UserResponse"]
