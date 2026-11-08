@@ -83,7 +83,7 @@ class Settings(BaseSettings):
         description="GROQ API key"
     )
     GROQ_MODEL: str = Field(
-        default_factory=lambda: _get_secret_or_env("GROQ_MODEL", "llama-3.1-8b-instant"),
+        default_factory=lambda: _get_secret_or_env("GROQ_MODEL", "openai/gpt-oss-120b"),
         description="GROQ model name"
     )
     GROQ_MAX_TOKENS: int = 1024

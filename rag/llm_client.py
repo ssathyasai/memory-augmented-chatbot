@@ -33,15 +33,24 @@ class GroqClient:
         try:
             api_key = settings.GROQ_API_KEY or "placeholder_key"
             self.client = self._create_client(api_key)
-            self.model = settings.GROQ_MODEL
+            self._model = settings.GROQ_MODEL or "openai/gpt-oss-120b"
             self.temperature = settings.GROQ_TEMPERATURE
             self.max_tokens = settings.GROQ_MAX_TOKENS
         except Exception as e:
             logger.warning(f"Warning during GROQ client initialization: {e}")
             self.client = None
-            self.model = settings.GROQ_MODEL
+            self._model = settings.GROQ_MODEL or "openai/gpt-oss-120b"
             self.temperature = settings.GROQ_TEMPERATURE
             self.max_tokens = settings.GROQ_MAX_TOKENS
+    
+    @property
+    def model(self) -> str:
+        """Dynamically get the model name."""
+        return self._model or getattr(settings, 'GROQ_MODEL', 'openai/gpt-oss-120b')
+    
+    @model.setter
+    def model(self, value: str):
+        self._model = value
     
     def chat_completion(
         self,
@@ -50,7 +59,7 @@ class GroqClient:
         max_tokens: int = None
     ) -> str:
         """
-        Generate chat completion.
+        Generate chat completion with automatic model fallback.
         
         Args:
             messages: List of message dictionaries with 'role' and 'content'
@@ -69,25 +78,44 @@ class GroqClient:
         if not settings.GROQ_API_KEY:
             raise LLMError("GROQ API Key is missing. Please set GROQ_API_KEY in your environment variables or Streamlit secrets.")
 
-        try:
-            if self.client is None or getattr(self.client, "api_key", None) == "placeholder_key":
-                self.client = self._create_client(settings.GROQ_API_KEY)
+        if self.client is None or getattr(self.client, "api_key", None) == "placeholder_key":
+            self.client = self._create_client(settings.GROQ_API_KEY)
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-            
-            generated_text = response.choices[0].message.content
-            logger.info(f"Generated response ({len(generated_text)} chars)")
-            
-            return generated_text
-        
-        except Exception as e:
-            logger.error(f"Error calling GROQ API: {e}")
-            raise LLMError(f"GROQ API error: {str(e)}")
+        # Fallback candidate models if the selected model is not available or deprecated on Groq
+        fallback_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+        current_model = self.model
+        models_to_try = [current_model] + [m for m in fallback_models if m != current_model]
+
+        last_error = None
+        for m in models_to_try:
+            try:
+                response = self.client.chat.completions.create(
+                    model=m,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                
+                if m != current_model:
+                    logger.info(f"Groq model '{current_model}' was unavailable. Automatically switched to '{m}'")
+                    self.model = m
+                    settings.GROQ_MODEL = m
+                
+                generated_text = response.choices[0].message.content
+                logger.info(f"Generated response ({len(generated_text)} chars) with {m}")
+                return generated_text
+
+            except Exception as e:
+                err_str = str(e)
+                if "model_not_found" in err_str or "does not exist" in err_str or "404" in err_str:
+                    logger.warning(f"Groq model '{m}' not found: {e}. Trying next candidate...")
+                    last_error = e
+                    continue
+                else:
+                    logger.error(f"Error calling GROQ API: {e}")
+                    raise LLMError(f"GROQ API error: {str(e)}")
+
+        raise LLMError(f"GROQ API error: {last_error}")
     
     def generate_response(
         self,
