@@ -28,36 +28,16 @@ class Neo4jManager:
         self._last_error: Optional[str] = None
         
     def _get_db_name(self) -> str:
-        """
-        Get database name.
-        
-        Ensures it defaults cleanly to 'neo4j' and prevents erroneous overrides 
-        (e.g., using an Aura instance ID as the database name).
-        """
-        database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
-        if not database:
-            return "neo4j"
-        user = getattr(settings, 'NEO4J_USER', 'neo4j')
-        uri = getattr(settings, 'NEO4J_URI', '')
-        # If database was set to the Aura instance ID (e.g. fc54b344) instead of 'neo4j'
-        if database != "neo4j" and (database == user or (uri and database in uri)):
-            return "neo4j"
-        return database
+        """Get database name as configured, defaulting to 'neo4j' if unset."""
+        database = getattr(settings, 'NEO4J_DATABASE', None)
+        return database or "neo4j"
 
     def _get_user(self) -> str:
-        """
-        Get Neo4j username.
-        
-        Defaults to 'neo4j'. If an Aura instance ID was erroneously entered as the username,
-        automatically falls back to 'neo4j' since Aura usernames are always 'neo4j'.
-        """
-        user = getattr(settings, 'NEO4J_USER', 'neo4j')
+        """Get Neo4j username as configured in settings, defaulting to 'neo4j' if unset."""
+        user = getattr(settings, 'NEO4J_USER', None)
         if not user:
-            return "neo4j"
-        uri = getattr(settings, 'NEO4J_URI', '')
-        if user != "neo4j" and uri and user in uri:
-            return "neo4j"
-        return user
+            user = getattr(settings, 'NEO4J_USERNAME', None)
+        return user or "neo4j"
     
     def connect(self, force: bool = False) -> bool:
         """
@@ -80,49 +60,58 @@ class Neo4jManager:
             logger.info("Neo4j credentials not configured. Skipping connection.")
             return False
 
-        user = self._get_user()
-        try:
-            self._driver = GraphDatabase.driver(
-                settings.NEO4J_URI,
-                auth=(user, settings.NEO4J_PASSWORD)
-            )
-            
-            # Test connection using verify_connectivity()
-            self._driver.verify_connectivity()
-            
-            logger.info(f"Connected to Neo4j at {settings.NEO4J_URI} as user '{user}'")
-            return True
-            
-        except AuthError as e:
-            self._last_error = f"Authentication failed for user '{user}': {e}"
-            logger.error(self._last_error)
-            if self._driver:
-                try:
-                    self._driver.close()
-                except Exception:
-                    pass
-            self._driver = None
-            return False
-        except ServiceUnavailable as e:
-            self._last_error = f"Neo4j service unavailable at {settings.NEO4J_URI}: {e}"
-            logger.error(self._last_error)
-            if self._driver:
-                try:
-                    self._driver.close()
-                except Exception:
-                    pass
-            self._driver = None
-            return False
-        except Exception as e:
-            self._last_error = f"Unexpected error connecting to Neo4j: {e}"
-            logger.error(self._last_error)
-            if self._driver:
-                try:
-                    self._driver.close()
-                except Exception:
-                    pass
-            self._driver = None
-            return False
+        configured_user = self._get_user()
+        
+        # Build candidate usernames: first the configured user, then fallback (instance ID or 'neo4j')
+        candidates = [configured_user]
+        
+        # Determine alternative username
+        uri = getattr(settings, 'NEO4J_URI', '')
+        instance_id = ""
+        if "://" in uri and ".databases.neo4j.io" in uri:
+            try:
+                instance_id = uri.split("://")[1].split(".")[0]
+            except Exception:
+                pass
+                
+        if configured_user != "neo4j" and "neo4j" not in candidates:
+            candidates.append("neo4j")
+        if instance_id and instance_id not in candidates:
+            candidates.append(instance_id)
+
+        last_auth_error = None
+        for user_candidate in candidates:
+            try:
+                driver = GraphDatabase.driver(
+                    settings.NEO4J_URI,
+                    auth=(user_candidate, settings.NEO4J_PASSWORD)
+                )
+                driver.verify_connectivity()
+                
+                self._driver = driver
+                settings.NEO4J_USER = user_candidate
+                logger.info(f"Connected to Neo4j at {settings.NEO4J_URI} as user '{user_candidate}'")
+                return True
+                
+            except AuthError as e:
+                last_auth_error = e
+                logger.warning(f"Neo4j auth failed for user '{user_candidate}'. Trying next candidate if available...")
+                continue
+            except ServiceUnavailable as e:
+                self._last_error = f"Neo4j service unavailable at {settings.NEO4J_URI}: {e}"
+                logger.error(self._last_error)
+                self._driver = None
+                return False
+            except Exception as e:
+                self._last_error = f"Unexpected error connecting to Neo4j: {e}"
+                logger.error(self._last_error)
+                self._driver = None
+                return False
+
+        self._last_error = f"Authentication failed for user '{configured_user}': {last_auth_error}"
+        logger.error(self._last_error)
+        self._driver = None
+        return False
     
     def get_status(self) -> Dict[str, Any]:
         """Get diagnostic status information about the Neo4j connection."""
