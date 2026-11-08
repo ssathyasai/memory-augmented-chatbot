@@ -182,6 +182,49 @@ except Exception as e:
     st.warning("Vector store stats unavailable")
     logger.error(f"Error getting vector store stats: {e}")
 
+# Neo4j Database Settings
+st.markdown("---")
+st.markdown("### 🕸️ Neo4j Knowledge Graph Database")
+
+from config.neo4j_client import neo4j_manager
+from config.settings import settings
+import os
+
+neo_status = neo4j_manager.get_status()
+if neo_status["connected"]:
+    st.success("✅ **Neo4j is Connected**")
+else:
+    st.warning("⚠️ **Neo4j is Disconnected**")
+    if neo_status.get("last_error"):
+        st.caption(f"Reason: {neo_status['last_error']}")
+
+with st.expander("⚙️ Configure Neo4j Connection", expanded=not neo_status["connected"]):
+    st.caption("For Neo4j Aura, username is **neo4j** and database is **neo4j** (not the instance ID).")
+    
+    cfg_uri = st.text_input("Neo4j URI", value=settings.NEO4J_URI, key="settings_neo4j_uri")
+    cfg_user = st.text_input("Neo4j Username", value=neo4j_manager._get_user(), key="settings_neo4j_user")
+    cfg_pwd = st.text_input("Neo4j Password", value=settings.NEO4J_PASSWORD, type="password", key="settings_neo4j_pwd")
+    cfg_db = st.text_input("Neo4j Database", value=neo4j_manager._get_db_name(), key="settings_neo4j_db")
+    
+    if st.button("🔌 Test & Connect Neo4j", type="primary", key="btn_test_neo4j"):
+        settings.NEO4J_URI = cfg_uri.strip()
+        settings.NEO4J_USER = cfg_user.strip() or "neo4j"
+        settings.NEO4J_PASSWORD = cfg_pwd.strip()
+        settings.NEO4J_DATABASE = cfg_db.strip() or "neo4j"
+        
+        os.environ["NEO4J_URI"] = settings.NEO4J_URI
+        os.environ["NEO4J_USER"] = settings.NEO4J_USER
+        os.environ["NEO4J_PASSWORD"] = settings.NEO4J_PASSWORD
+        os.environ["NEO4J_DATABASE"] = settings.NEO4J_DATABASE
+        
+        with st.spinner("Connecting to Neo4j..."):
+            if neo4j_manager.connect(force=True):
+                neo4j_manager.create_constraints_and_indexes()
+                st.success("✅ Connected successfully to Neo4j database!")
+                st.rerun()
+            else:
+                st.error(f"❌ Connection failed: {neo4j_manager._last_error or 'Check credentials'}")
+
 # Danger Zone
 st.markdown("---")
 st.markdown("### ⚠️ Danger Zone")

@@ -58,16 +58,16 @@ class Settings(BaseSettings):
         description="Neo4j connection URI"
     )
     NEO4J_USER: str = Field(
-        default_factory=lambda: _get_secret_or_env("NEO4J_USER", "fc54b344"),
-        description="Neo4j username (for Aura, use instance ID)"
+        default_factory=lambda: _get_secret_or_env("NEO4J_USER", "neo4j"),
+        description="Neo4j username (default is 'neo4j' for both Aura and local)"
     )
     NEO4J_PASSWORD: str = Field(
         default_factory=lambda: _get_secret_or_env("NEO4J_PASSWORD", ""),
         description="Neo4j password"
     )
     NEO4J_DATABASE: str = Field(
-        default_factory=lambda: _get_secret_or_env("NEO4J_DATABASE", "fc54b344"),
-        description="Neo4j database name (for Aura, use instance ID)"
+        default_factory=lambda: _get_secret_or_env("NEO4J_DATABASE", "neo4j"),
+        description="Neo4j database name (default is 'neo4j')"
     )
     
     # GROQ

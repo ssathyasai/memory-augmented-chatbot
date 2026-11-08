@@ -2,9 +2,10 @@
 
 Process Flow:
 1. Executes Cypher `MERGE` queries to upsert user-isolated `Entity` nodes with property dictionaries.
-2. Executes Cypher `MATCH`/`MERGE` queries to create directed `RELATED` edges between entities.
+2. Executes Cypher `MERGE` queries to create directed `RELATED` edges between entities.
 3. Queries graph entities, relationship types, and node connection counts for visualization and graph analytics.
 4. Executes Cypher deletion statements for document-specific, session-specific, or full-user graph wipe requests.
+5. Employs dynamic driver and database resolution with resilient session handling.
 """
 
 import logging
@@ -28,10 +29,24 @@ class Neo4jKnowledgeGraph:
             user_id: User ID for data isolation
         """
         self.user_id = user_id
-        self.driver = neo4j_manager.get_driver()
-        self.database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
-        if self.database == "neo4j" and settings.NEO4J_USER and settings.NEO4J_USER != "neo4j":
-            self.database = settings.NEO4J_USER
+    
+    @property
+    def driver(self):
+        """Dynamically retrieve driver from neo4j_manager."""
+        return neo4j_manager.get_driver()
+
+    @property
+    def database(self) -> str:
+        """Dynamically retrieve sanitized database name."""
+        return neo4j_manager._get_db_name()
+
+    def _get_session(self):
+        """Safely open a Neo4j session with fallback to default database."""
+        db = self.database
+        try:
+            return self.driver.session(database=db)
+        except Exception:
+            return self.driver.session()
     
     def add_entity(
         self,
@@ -55,24 +70,21 @@ class Neo4jKnowledgeGraph:
             return False
         
         try:
-            props = properties or {}
+            props = dict(properties) if properties else {}
             props.update({
                 "user_id": self.user_id,
                 "name": entity_name,
                 "type": entity_type
             })
             
-            # Convert properties to Cypher format
-            props_str = ", ".join([f"{k}: ${k}" for k in props.keys()])
-            
-            query = f"""
-            MERGE (e:Entity {{user_id: $user_id, name: $name}})
-            SET e += {{{props_str}}}
+            query = """
+            MERGE (e:Entity {user_id: $user_id, name: $name})
+            SET e += $props
             RETURN e
             """
             
-            with self.driver.session(database=self.database) as session:
-                session.run(query, **props)
+            with self._get_session() as session:
+                session.run(query, user_id=self.user_id, name=entity_name, props=props)
             
             return True
         
@@ -104,7 +116,7 @@ class Neo4jKnowledgeGraph:
             return False
         
         try:
-            props = properties or {}
+            props = dict(properties) if properties else {}
             props["type"] = relationship_type
             
             # Enforce uniqueness for single-valued relationship types starting from the source
@@ -114,19 +126,19 @@ class Neo4jKnowledgeGraph:
                 MATCH (s:Entity {user_id: $user_id, name: $source})-[r:RELATED {type: $rel_type}]->()
                 DELETE r
                 """
-                with self.driver.session(database=self.database) as session:
+                with self._get_session() as session:
                     session.run(delete_query, user_id=self.user_id, source=source_entity, rel_type=relationship_type)
                     logger.info(f"Deleted old single-valued relationship '{relationship_type}' starting from '{source_entity}'")
             
             query = """
-            MATCH (s:Entity {user_id: $user_id, name: $source})
-            MATCH (t:Entity {user_id: $user_id, name: $target})
+            MERGE (s:Entity {user_id: $user_id, name: $source})
+            MERGE (t:Entity {user_id: $user_id, name: $target})
             MERGE (s)-[r:RELATED {type: $rel_type}]->(t)
             SET r += $properties
             RETURN r
             """
             
-            with self.driver.session(database=self.database) as session:
+            with self._get_session() as session:
                 session.run(
                     query,
                     user_id=self.user_id,
@@ -172,7 +184,7 @@ class Neo4jKnowledgeGraph:
                 """
                 params = {"user_id": self.user_id, "limit": limit}
             
-            with self.driver.session(database=self.database) as session:
+            with self._get_session() as session:
                 result = session.run(query, **params)
                 entities = [dict(record) for record in result]
             
@@ -213,7 +225,7 @@ class Neo4jKnowledgeGraph:
                 """
                 params = {"user_id": self.user_id}
             
-            with self.driver.session(database=self.database) as session:
+            with self._get_session() as session:
                 result = session.run(query, **params)
                 relationships = [dict(record) for record in result]
             
@@ -234,20 +246,22 @@ class Neo4jKnowledgeGraph:
             return {"entities": 0, "relationships": 0}
         
         try:
-            with self.driver.session(database=self.database) as session:
+            with self._get_session() as session:
                 # Count entities
                 result = session.run(
                     "MATCH (e:Entity {user_id: $user_id}) RETURN count(e) AS count",
                     user_id=self.user_id
                 )
-                entity_count = result.single()["count"]
+                record = result.single()
+                entity_count = record["count"] if record else 0
                 
                 # Count relationships
                 result = session.run(
                     "MATCH (s:Entity {user_id: $user_id})-[r:RELATED]->() RETURN count(r) AS count",
                     user_id=self.user_id
                 )
-                rel_count = result.single()["count"]
+                record = result.single()
+                rel_count = record["count"] if record else 0
             
             return {
                 "entities": entity_count,
@@ -273,7 +287,7 @@ class Neo4jKnowledgeGraph:
             return False
             
         try:
-            with self.driver.session(database=self.database) as session:
+            with self._get_session() as session:
                 # 1. Delete relationships matching user_id and session_id
                 session.run(
                     "MATCH (s:Entity {user_id: $user_id})-[r:RELATED {session_id: $session_id}]->(t:Entity) DELETE r",
@@ -285,7 +299,7 @@ class Neo4jKnowledgeGraph:
                     "MATCH (e:Entity {user_id: $user_id}) WHERE NOT (e)-[]-() DELETE e",
                     user_id=self.user_id
                 )
-            logger.info(f"Deleted relationships and clean up orphans for session: {session_id}")
+            logger.info(f"Deleted relationships and cleaned up orphans for session: {session_id}")
             return True
         except Exception as e:
             logger.error(f"Error deleting session relationships: {e}")
@@ -306,7 +320,7 @@ class Neo4jKnowledgeGraph:
             return False
             
         try:
-            with self.driver.session(database=self.database) as session:
+            with self._get_session() as session:
                 # 1. Delete relationships matching user_id and document_id
                 session.run(
                     "MATCH (s:Entity {user_id: $user_id})-[r:RELATED {document_id: $document_id}]->(t:Entity) DELETE r",
@@ -318,10 +332,12 @@ class Neo4jKnowledgeGraph:
                     "MATCH (e:Entity {user_id: $user_id}) WHERE NOT (e)-[]-() DELETE e",
                     user_id=self.user_id
                 )
-            logger.info(f"Deleted relationships and clean up orphans for document: {document_id}")
+            logger.info(f"Deleted relationships and cleaned up orphans for document: {document_id}")
             return True
         except Exception as e:
             logger.error(f"Error deleting document relationships: {e}")
+            return False
+
     def get_subgraph_around_entities(self, names: List[str]) -> Dict[str, Any]:
         """
         Retrieve nodes and relationships within 2 hops of the given entity names.
@@ -347,7 +363,7 @@ class Neo4jKnowledgeGraph:
             RETURN DISTINCT startNode(rel).name AS source, endNode(rel).name AS target, rel.type AS type, properties(rel) AS properties
             """
             
-            with self.driver.session(database=self.database) as session:
+            with self._get_session() as session:
                 result_rels = session.run(query_rels, user_id=self.user_id, names_lower=names_lower)
                 relationships = [dict(record) for record in result_rels]
                 
@@ -387,7 +403,7 @@ class Neo4jKnowledgeGraph:
             return False
             
         try:
-            with self.driver.session(database=self.database) as session:
+            with self._get_session() as session:
                 session.run(
                     "MATCH (e:Entity {user_id: $user_id}) DETACH DELETE e",
                     user_id=self.user_id

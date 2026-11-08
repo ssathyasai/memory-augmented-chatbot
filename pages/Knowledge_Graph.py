@@ -24,6 +24,41 @@ require_auth()
 # Page config
 st.title("🧠 Knowledge Graph")
 
+from config.neo4j_client import neo4j_manager
+
+# Connection health check & troubleshooting card
+neo_status = neo4j_manager.get_status()
+if not neo_status["connected"]:
+    st.warning("⚠️ **Neo4j Database is currently disconnected.** Knowledge Graph operations are offline.")
+    with st.expander("🔧 Neo4j Connection Troubleshooting & Reconnect", expanded=True):
+        st.markdown(f"- **URI:** `{neo_status['uri']}`")
+        st.markdown(f"- **User:** `{neo_status['user']}`")
+        st.markdown(f"- **Database:** `{neo_status['database']}`")
+        st.markdown(f"- **Password Set:** `{'Yes' if neo_status['has_password'] else 'No (Missing password in .env or settings)'}`")
+        if neo_status.get("last_error"):
+            st.error(f"**Error Details:** {neo_status['last_error']}")
+        
+        st.info("💡 **Aura Tip:** In Neo4j Aura, username is **neo4j** and database is **neo4j** (not the instance ID).")
+        
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            input_pwd = st.text_input("Enter Neo4j Password", type="password", key="kg_page_neo4j_pwd")
+        with c2:
+            st.write("")
+            st.write("")
+            if st.button("🔌 Reconnect", type="primary", key="kg_page_reconnect_btn"):
+                if input_pwd:
+                    import os
+                    from config.settings import settings
+                    settings.NEO4J_PASSWORD = input_pwd.strip()
+                    os.environ["NEO4J_PASSWORD"] = input_pwd.strip()
+                if neo4j_manager.connect(force=True):
+                    neo4j_manager.create_constraints_and_indexes()
+                    st.success("✅ Neo4j connected successfully!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Connection failed: {neo4j_manager._last_error or 'Check credentials'}")
+
 user_id = get_user_id()
 
 # Initialize knowledge graph manager
@@ -54,37 +89,43 @@ st.markdown("---")
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
     if st.button("🔄 Analyze Past Chats & Load Graph", type="primary", use_container_width=True):
-        with st.spinner("Analyzing all your past chats to build your Knowledge Graph..."):
-            from config.database import get_database
-            db = get_database()
-            if db is not None:
-                # 1. Clear current graph first to avoid duplicates
-                kg_manager.kg.clear_graph()
-                
-                # 2. Find all chats for this user in MongoDB (in chronological order)
-                user_chats = list(db.chats.find({"user_id": user_id}).sort("timestamp", 1))
-                
-                # 3. Re-process each chat to extract relationships
-                processed_count = 0
-                for chat in user_chats:
-                    question = chat.get("question", "")
-                    answer = chat.get("answer", "")
-                    session_id = chat.get("session_id")
-                    if question and answer:
-                        kg_manager.process_conversation(question, answer, session_id=session_id)
-                        processed_count += 1
-                
-                st.success(f"✅ Load complete! Successfully analyzed {processed_count} past conversation turns and loaded your Knowledge Graph.")
-                st.rerun()
-            else:
-                st.error("Database connection unavailable.")
+        if not neo4j_manager.is_connected():
+            st.error("Neo4j database is disconnected. Please connect Neo4j before loading the graph.")
+        else:
+            with st.spinner("Analyzing all your past chats to build your Knowledge Graph..."):
+                from config.database import get_database
+                db = get_database()
+                if db is not None:
+                    # 1. Clear current graph first to avoid duplicates
+                    kg_manager.kg.clear_graph()
+                    
+                    # 2. Find all chats for this user in MongoDB (in chronological order)
+                    user_chats = list(db.chats.find({"user_id": user_id}).sort("timestamp", 1))
+                    
+                    # 3. Re-process each chat to extract relationships
+                    processed_count = 0
+                    for chat in user_chats:
+                        question = chat.get("question", "")
+                        answer = chat.get("answer", "")
+                        session_id = chat.get("session_id")
+                        if question and answer:
+                            kg_manager.process_conversation(question, answer, session_id=session_id)
+                            processed_count += 1
+                    
+                    st.success(f"✅ Load complete! Successfully analyzed {processed_count} past conversation turns and loaded your Knowledge Graph.")
+                    st.rerun()
+                else:
+                    st.error("Database connection unavailable.")
 
 with col_btn2:
     if st.button("🗑️ Reset Knowledge Graph", type="secondary", use_container_width=True):
-        with st.spinner("Clearing your Knowledge Graph..."):
-            kg_manager.kg.clear_graph()
-            st.success("✅ Knowledge Graph cleared successfully!")
-            st.rerun()
+        if not neo4j_manager.is_connected():
+            st.error("Neo4j database is disconnected. Please connect Neo4j before clearing.")
+        else:
+            with st.spinner("Clearing your Knowledge Graph..."):
+                kg_manager.kg.clear_graph()
+                st.success("✅ Knowledge Graph cleared successfully!")
+                st.rerun()
 
 # Tabs for different views
 tab1, tab2, tab3 = st.tabs(["📌 Entities", "🔗 Relationships", "📊 Analytics"])

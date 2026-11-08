@@ -61,17 +61,19 @@ python -m spacy download en_core_web_sm
 
 ### 2. Configure Environment
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the root directory (you can copy `.env.example`):
 
 ```env
 JWT_SECRET_KEY="your-secret-key-min-32-chars"
 MONGODB_URI="mongodb+srv://<username>:<password>@cluster.mongodb.net/?retryWrites=true&w=majority"
 NEO4J_URI="neo4j+s://<instance-id>.databases.neo4j.io"
-NEO4J_USER="<instance-id>"
+NEO4J_USER="neo4j"
 NEO4J_PASSWORD="your-neo4j-password"
-NEO4J_DATABASE="<instance-id>"
+NEO4J_DATABASE="neo4j"
 GROQ_API_KEY="gsk_xxxxxxxxxxxxxxxxxxxxx"
 ```
+
+> **Note for Neo4j Aura:** Always set `NEO4J_USER="neo4j"` and `NEO4J_DATABASE="neo4j"`. The instance ID is only part of the `NEO4J_URI`, not the username or database name.
 
 ### 3. Run Locally
 

@@ -3,8 +3,9 @@
 Process Flow:
 1. Instantiates Bolt driver connection using configured URI and credentials (compatible with Neo4j Aura & local instances).
 2. Verifies graph database connectivity using `driver.verify_connectivity()`.
-3. Handles database name resolution for instance multi-tenancy.
-4. Auto-creates Cypher constraints and indexes (`User`, `Document`, `Entity`, `Chunk`, `Concept`) for performant graph traversal.
+3. Handles database name resolution (defaulting cleanly to 'neo4j' without erroneous overrides).
+4. Auto-creates Cypher constraints and indexes (`User`, `Entity`) for performant graph traversal.
+5. Provides diagnostic status inspection and fault-tolerant query execution.
 """
 
 import logging
@@ -24,13 +25,39 @@ class Neo4jManager:
         """Initialize Neo4j manager."""
         self._driver: Optional[Driver] = None
         self._connection_attempted: bool = False
+        self._last_error: Optional[str] = None
         
     def _get_db_name(self) -> str:
-        """Get database name, falling back to user on Aura if database is defaulting to 'neo4j'."""
+        """
+        Get database name.
+        
+        Ensures it defaults cleanly to 'neo4j' and prevents erroneous overrides 
+        (e.g., using an Aura instance ID as the database name).
+        """
         database = getattr(settings, 'NEO4J_DATABASE', 'neo4j')
-        if database == "neo4j" and settings.NEO4J_USER and settings.NEO4J_USER != "neo4j":
-            return settings.NEO4J_USER
+        if not database:
+            return "neo4j"
+        user = getattr(settings, 'NEO4J_USER', 'neo4j')
+        uri = getattr(settings, 'NEO4J_URI', '')
+        # If database was set to the Aura instance ID (e.g. fc54b344) instead of 'neo4j'
+        if database != "neo4j" and (database == user or (uri and database in uri)):
+            return "neo4j"
         return database
+
+    def _get_user(self) -> str:
+        """
+        Get Neo4j username.
+        
+        Defaults to 'neo4j'. If an Aura instance ID was erroneously entered as the username,
+        automatically falls back to 'neo4j' since Aura usernames are always 'neo4j'.
+        """
+        user = getattr(settings, 'NEO4J_USER', 'neo4j')
+        if not user:
+            return "neo4j"
+        uri = getattr(settings, 'NEO4J_URI', '')
+        if user != "neo4j" and uri and user in uri:
+            return "neo4j"
+        return user
     
     def connect(self, force: bool = False) -> bool:
         """
@@ -46,25 +73,39 @@ class Neo4jManager:
             return False
 
         self._connection_attempted = True
+        self._last_error = None
 
         if not settings.NEO4J_PASSWORD or not settings.NEO4J_URI:
+            self._last_error = "Neo4j credentials (NEO4J_PASSWORD or NEO4J_URI) not configured in environment or .env."
             logger.info("Neo4j credentials not configured. Skipping connection.")
             return False
 
+        user = self._get_user()
         try:
             self._driver = GraphDatabase.driver(
                 settings.NEO4J_URI,
-                auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
+                auth=(user, settings.NEO4J_PASSWORD)
             )
             
             # Test connection using verify_connectivity()
             self._driver.verify_connectivity()
             
-            logger.info("Connected to Neo4j")
+            logger.info(f"Connected to Neo4j at {settings.NEO4J_URI} as user '{user}'")
             return True
             
-        except (ServiceUnavailable, AuthError) as e:
-            logger.error(f"Failed to connect to Neo4j: {e}")
+        except AuthError as e:
+            self._last_error = f"Authentication failed for user '{user}': {e}"
+            logger.error(self._last_error)
+            if self._driver:
+                try:
+                    self._driver.close()
+                except Exception:
+                    pass
+            self._driver = None
+            return False
+        except ServiceUnavailable as e:
+            self._last_error = f"Neo4j service unavailable at {settings.NEO4J_URI}: {e}"
+            logger.error(self._last_error)
             if self._driver:
                 try:
                     self._driver.close()
@@ -73,7 +114,8 @@ class Neo4jManager:
             self._driver = None
             return False
         except Exception as e:
-            logger.error(f"Unexpected error connecting to Neo4j: {e}")
+            self._last_error = f"Unexpected error connecting to Neo4j: {e}"
+            logger.error(self._last_error)
             if self._driver:
                 try:
                     self._driver.close()
@@ -82,6 +124,18 @@ class Neo4jManager:
             self._driver = None
             return False
     
+    def get_status(self) -> Dict[str, Any]:
+        """Get diagnostic status information about the Neo4j connection."""
+        connected = self.is_connected()
+        return {
+            "connected": connected,
+            "uri": settings.NEO4J_URI,
+            "user": self._get_user(),
+            "database": self._get_db_name(),
+            "has_password": bool(settings.NEO4J_PASSWORD),
+            "last_error": self._last_error if not connected else None
+        }
+
     def get_driver(self) -> Optional[Driver]:
         """
         Get Neo4j driver instance.
@@ -90,7 +144,6 @@ class Neo4jManager:
             Driver or None if not connected
         """
         if self._driver is None:
-            logger.warning("Neo4j not connected. Attempting to connect...")
             self.connect()
         return self._driver
     
@@ -107,7 +160,8 @@ class Neo4jManager:
         try:
             self._driver.verify_connectivity()
             return True
-        except Exception:
+        except Exception as e:
+            self._last_error = str(e)
             return False
     
     def disconnect(self):
@@ -118,49 +172,48 @@ class Neo4jManager:
             self._driver = None
     
     def create_constraints_and_indexes(self):
-        """Create necessary constraints and indexes."""
-        if self._driver is None:
+        """Create necessary constraints and indexes with individual error isolation."""
+        driver = self.get_driver()
+        if driver is None:
             logger.error("Cannot create constraints: driver not connected")
             return
         
-        try:
-            # Use execute_query with database_ parameter for Aura
-            database = self._get_db_name()
-            
-            # User node uniqueness constraint
-            summary = self._driver.execute_query("""
+        database = self._get_db_name()
+        
+        statements = [
+            ("user_id_unique constraint", """
                 CREATE CONSTRAINT user_id_unique IF NOT EXISTS
                 FOR (u:User) REQUIRE u.id IS UNIQUE
-            """, database_=database)
-            
-            # Entity node uniqueness constraint
-            summary = self._driver.execute_query("""
-                CREATE CONSTRAINT entity_id_unique IF NOT EXISTS
-                FOR (e:Entity) REQUIRE e.id IS UNIQUE
-            """, database_=database)
-            
-            # Index on entity user_id for isolation
-            summary = self._driver.execute_query("""
+            """),
+            ("entity_user_id index", """
                 CREATE INDEX entity_user_id IF NOT EXISTS
                 FOR (e:Entity) ON (e.user_id)
-            """, database_=database)
-            
-            # Index on entity name for search
-            summary = self._driver.execute_query("""
+            """),
+            ("entity_name index", """
                 CREATE INDEX entity_name IF NOT EXISTS
                 FOR (e:Entity) ON (e.name)
-            """, database_=database)
-            
-            # Index on entity type
-            summary = self._driver.execute_query("""
+            """),
+            ("entity_user_name index", """
+                CREATE INDEX entity_user_name IF NOT EXISTS
+                FOR (e:Entity) ON (e.user_id, e.name)
+            """),
+            ("entity_type index", """
                 CREATE INDEX entity_type IF NOT EXISTS
                 FOR (e:Entity) ON (e.type)
-            """, database_=database)
-            
-            logger.info("Neo4j constraints and indexes created successfully")
-            
-        except Exception as e:
-            logger.error(f"Error creating constraints/indexes: {e}")
+            """),
+        ]
+        
+        for name, stmt in statements:
+            try:
+                try:
+                    driver.execute_query(stmt, database_=database)
+                except Exception:
+                    driver.execute_query(stmt)
+                logger.info(f"Neo4j {name} verified/created.")
+            except Exception as e:
+                logger.warning(f"Could not create Neo4j {name}: {e}")
+        
+        logger.info("Neo4j constraints and indexes processed successfully")
     
     def execute_query(self, query: str, parameters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
@@ -173,17 +226,28 @@ class Neo4jManager:
         Returns:
             List of result records as dictionaries
         """
-        if self._driver is None:
+        driver = self.get_driver()
+        if driver is None:
             logger.error("Cannot execute query: driver not connected")
             return []
         
+        database = self._get_db_name()
         try:
-            database = self._get_db_name()
-            records, summary, keys = self._driver.execute_query(
-                query, 
-                parameters or {}, 
-                database_=database
-            )
+            try:
+                records, summary, keys = driver.execute_query(
+                    query, 
+                    parameters or {}, 
+                    database_=database
+                )
+            except Exception as db_err:
+                if database != "neo4j":
+                    records, summary, keys = driver.execute_query(
+                        query, 
+                        parameters or {}, 
+                        database_="neo4j"
+                    )
+                else:
+                    raise db_err
             return [dict(record) for record in records]
         except Exception as e:
             logger.error(f"Error executing query: {e}")
@@ -200,13 +264,20 @@ class Neo4jManager:
         Returns:
             bool: True if successful, False otherwise
         """
-        if self._driver is None:
+        driver = self.get_driver()
+        if driver is None:
             logger.error("Cannot execute write query: driver not connected")
             return False
         
+        database = self._get_db_name()
         try:
-            database = self._get_db_name()
-            self._driver.execute_query(query, parameters or {}, database_=database)
+            try:
+                driver.execute_query(query, parameters or {}, database_=database)
+            except Exception as db_err:
+                if database != "neo4j":
+                    driver.execute_query(query, parameters or {}, database_="neo4j")
+                else:
+                    raise db_err
             return True
         except Exception as e:
             logger.error(f"Error executing write query: {e}")

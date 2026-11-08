@@ -115,7 +115,14 @@ def main():
     if neo4j_connected:
         st.sidebar.success("✅ Neo4j Connected")
     else:
-        st.sidebar.warning("⚠️ Neo4j Disconnected (KG features disabled)")
+        status = neo4j_manager.get_status()
+        reason = "Missing Password" if not status.get("has_password") else "Connection Failed"
+        st.sidebar.warning(f"⚠️ Neo4j Disconnected ({reason})")
+        if status.get("last_error"):
+            with st.sidebar.expander("Neo4j Details"):
+                st.caption(f"**URI:** {status.get('uri')}")
+                st.caption(f"**User:** {status.get('user')}")
+                st.caption(f"**Error:** {status.get('last_error')[:100]}")
     
     st.sidebar.markdown("---")
     
