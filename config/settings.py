@@ -15,12 +15,19 @@ from typing import List, Any
 
 def _get_secret_or_env(key: str, default: str = "") -> str:
     """Helper to fetch configuration value from os.environ or streamlit.secrets."""
-    if key in os.environ and os.environ[key]:
-        return os.environ[key]
+    keys_to_check = [key]
+    if key == "NEO4J_USER":
+        keys_to_check.append("NEO4J_USERNAME")
+
+    for k in keys_to_check:
+        if k in os.environ and os.environ[k]:
+            return os.environ[k]
     try:
         import streamlit as st
-        if hasattr(st, "secrets") and key in st.secrets and st.secrets[key]:
-            return str(st.secrets[key])
+        if hasattr(st, "secrets") and st.secrets:
+            for k in keys_to_check:
+                if k in st.secrets and st.secrets[k]:
+                    return str(st.secrets[k])
     except Exception:
         pass
     return default
